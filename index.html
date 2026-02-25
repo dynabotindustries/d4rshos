@@ -218,6 +218,32 @@
         .pdf-container { display: flex; flex-direction: column; height: 100%; }
         .pdf-container iframe { flex: 1; border: none; background: white; }
 
+        /* Image Viewer */
+        .image-viewer-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+        }
+        .image-viewer-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        /* Matrix Text Effect */
+        .matrix-text {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #0f0;
+            text-shadow: 0 0 5px #0f0;
+            cursor: pointer;
+            letter-spacing: 1px;
+            display: inline-block;
+        }
+
         canvas { background: #000; display: block; margin: 0 auto; border: 1px solid #444; }
 
         /* Helper for text selection in inputs */
@@ -291,6 +317,8 @@
             { id: 'files', name: 'File Explorer', icon: '📁', type: 'app' },
             { id: 'calculator', name: 'Calculator', icon: '🧮', type: 'app' },
             { id: 'settings', name: 'Settings', icon: '⚙️', type: 'app' },
+            { id: 'notes', name: 'Notes', icon: '🗒️', type: 'app' },
+            { id: 'imageviewer', name: 'Image Viewer', icon: '🖼️', type: 'app' },
             { id: 'paint', name: 'Paint', icon: '🎨', type: 'app' },
             { id: 'sysinfo', name: 'System Info', icon: 'ℹ️', type: 'app' },
             { id: 'camera', name: 'Camera', icon: '📷', type: 'app' },
@@ -376,11 +404,16 @@
             localStorage.setItem('d4sh-theme', theme);
         }
 
+        // --- GLOBAL STATE & CLEANUP HELPERS ---
+        const windowFileBlobs = {};
+
+
         // --- WINDOW MANAGER ---
-        function openWindow(app) {
+        function openWindow(app, data = null) {
             // Check if already open
             if (document.getElementById(`win-${app.id}`)) {
                 focusWindow(document.getElementById(`win-${app.id}`));
+                if (data) loadAppContent(app, `content-${app.id}`, data);
                 return;
             }
 
@@ -410,7 +443,7 @@
 
             document.getElementById('desktop').appendChild(win);
             addToTaskbar(app);
-            loadAppContent(app, `content-${app.id}`);
+            loadAppContent(app, `content-${app.id}`, data);
         }
 
         function closeWindow(id) {
@@ -436,6 +469,12 @@
                 if (appTimers[appId]) {
                     appTimers[appId].forEach(t => clearInterval(t));
                     delete appTimers[appId];
+                }
+
+                // Clean up blob URLs from opened files
+                if (windowFileBlobs[id]) {
+                    URL.revokeObjectURL(windowFileBlobs[id]);
+                    delete windowFileBlobs[id];
                 }
 
                 win.remove();
@@ -519,8 +558,9 @@
         const audioContexts = {};
         const appTimers = {};
 
-        function loadAppContent(app, containerId) {
-            const container = document.getElementById(containerId);
+
+        function loadAppContent(app, containerId, data = null) {
+            const container = document.getElementById(containerId);            
             
             if (app.id === 'todo') loadTodo(container);
             else if (app.id === 'diary') loadDiary(container);
@@ -528,14 +568,16 @@
             else if (app.id === 'files') loadFileExplorer(container);
             else if (app.id === 'calculator') loadCalculator(container);
             else if (app.id === 'settings') loadSettings(container);
+            else if (app.id === 'notes') loadNotes(container, data);
+            else if (app.id === 'imageviewer') loadImageViewer(container, data);
             else if (app.id === 'paint') loadPaint(container);
             else if (app.id === 'sysinfo') loadSysInfo(container);
             else if (app.id === 'camera') loadCamera(container, app.id);
-            else if (app.id === 'video') loadVideoPlayer(container);
+            else if (app.id === 'video') loadVideoPlayer(container, data);
             else if (app.id === 'markdown') loadMarkdown(container);
-            else if (app.id === 'music') loadMusicPlayer(container, app.id);
+            else if (app.id === 'music') loadMusicPlayer(container, app.id, data);
             else if (app.id === 'clock') loadClock(container, app.id);
-            else if (app.id === 'pdf') loadPDFViewer(container);
+            else if (app.id === 'pdf') loadPDFViewer(container, data);
             else if (app.id === 'snake') loadSnake(container, app.id);
             else if (app.id === 'dino') loadDino(container, app.id);
             else if (app.id === 'flappy') loadFlappy(container, app.id);
@@ -665,11 +707,15 @@
                     <div class="file-list-panel">
                         <h3>Files</h3>
                         <ul id="file-list"></ul>
-                        <button class="app-btn" id="new-file-btn">New File</button>
+                        <div style="display:flex; gap:5px;">
+                            <button class="app-btn" id="new-file-btn" style="flex:1;">New Text File</button>
+                            <button class="app-btn" id="upload-file-btn" style="flex:1;">Upload</button>
+                            <input type="file" id="file-upload-input" style="display:none;" multiple>
+                        </div>
                     </div>
                     <div class="file-preview-panel">
                         <h3 id="preview-title">Select a file</h3>
-                        <textarea id="file-content" readonly></textarea>
+                        <div id="preview-content" style="font-size:12px; color:#ccc; overflow-y:auto; flex:1;"></div>
                         <button class="app-btn" id="delete-file-btn" style="display:none; background:red;">Delete</button>
                     </div>
                 </div>
@@ -677,35 +723,117 @@
 
             const fileListEl = container.querySelector('#file-list');
             const newFileBtn = container.querySelector('#new-file-btn');
+            const uploadBtn = container.querySelector('#upload-file-btn');
+            const uploadInput = container.querySelector('#file-upload-input');
             const deleteFileBtn = container.querySelector('#delete-file-btn');
             const previewTitle = container.querySelector('#preview-title');
-            const fileContent = container.querySelector('#file-content');
+            const previewContent = container.querySelector('#preview-content');
             let selectedFile = null;
 
             const getFiles = () => JSON.parse(localStorage.getItem('d4sh-fs') || '{}');
             const saveFiles = (files) => localStorage.setItem('d4sh-fs', JSON.stringify(files));
 
+            const getFileIcon = (type) => {
+                if (!type) return '📁';
+                if (type.startsWith('video')) return '🎥';
+                if (type.startsWith('audio')) return '🎵';
+                if (type.startsWith('text')) return '🗒️';
+                if (type.startsWith('image')) return '🖼️';
+                if (type === 'application/pdf') return '📄';
+                return '📁';
+            };
+
             const render = () => {
                 const files = getFiles();
-                fileListEl.innerHTML = Object.keys(files).map(name => `<li data-filename="${name}">${name}</li>`).join('');
+                fileListEl.innerHTML = Object.keys(files).map(name => {
+                    const file = files[name];
+                    return `<li data-filename="${name}">${getFileIcon(file.type)} ${name}</li>`;
+                }).join('');
                 
                 if (selectedFile && !files[selectedFile]) {
                     selectedFile = null;
                     previewTitle.innerText = 'Select a file';
-                    fileContent.value = '';
+                    previewContent.innerHTML = '';
                     deleteFileBtn.style.display = 'none';
                 }
             };
 
             fileListEl.addEventListener('click', (e) => {
                 if (e.target.tagName === 'LI') {
+                    // Highlight selection
+                    Array.from(e.target.parentElement.children).forEach(el => el.style.background = '');
+                    e.target.style.background = 'rgba(255,255,255,0.1)';
+
                     selectedFile = e.target.dataset.filename;
                     const files = getFiles();
-                    previewTitle.innerText = selectedFile;
-                    fileContent.value = files[selectedFile];
+                    const file = files[selectedFile];
+                    previewTitle.innerText = file ? selectedFile : 'Select a file';
+                    
+                    if (file) {
+                        let previewHTML = `<strong>Type:</strong> ${file.type}<br>`;
+                        if (file.size) previewHTML += `<strong>Size:</strong> ${(file.size / 1024).toFixed(2)} KB<br>`;
+                        if (file.url) previewHTML += `<br><i style="color:#aaa;">This file is available for the current session only.</i>`;
+                        
+                        if (file.content !== undefined) {
+                            previewHTML += `<hr><pre style="white-space:pre-wrap; word-break:break-all; user-select:text;">${file.content.substring(0, 200)}...</pre>`;
+                        } else {
+                            previewHTML += `<hr>Double-click to open in its app.`;
+                        }
+                        previewContent.innerHTML = previewHTML;
+                    }
                     deleteFileBtn.style.display = 'inline-block';
                 }
             });
+
+            fileListEl.addEventListener('dblclick', (e) => {
+                if (e.target.tagName === 'LI') {
+                    const filename = e.target.dataset.filename;
+                    const files = getFiles();
+                    const fileData = files[filename];
+                    if (!fileData) return;
+
+                    let appToOpenId = null;
+                    if (fileData.type.startsWith('text')) appToOpenId = 'notes';
+                    else if (fileData.type.startsWith('video')) appToOpenId = 'video';
+                    else if (fileData.type.startsWith('audio')) appToOpenId = 'music';
+                    else if (fileData.type.startsWith('image')) appToOpenId = 'imageviewer';
+                    else if (fileData.type === 'application/pdf') appToOpenId = 'pdf';
+
+                    if (appToOpenId) {
+                        const app = apps.find(a => a.id === appToOpenId);
+                        const payload = { ...fileData, filename };
+                        openWindow(app, payload);
+                    } else {
+                        alert(`No application available to open files of type: ${fileData.type}`);
+                    }
+                }
+            });
+
+            uploadBtn.onclick = () => uploadInput.click();
+            uploadInput.onchange = () => {
+                const files = getFiles();
+                for (const file of uploadInput.files) {
+                    if (files[file.name]) {
+                        alert(`File "${file.name}" already exists. Please rename and upload again.`);
+                        continue;
+                    }
+
+                    if (file.type.startsWith('text')) {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                            files[file.name] = { type: file.type, content: ev.target.result, size: file.size };
+                            saveFiles(files);
+                            render();
+                        };
+                        reader.readAsText(file);
+                    } else {
+                        files[file.name] = { type: file.type, url: URL.createObjectURL(file), size: file.size };
+                    }
+                }
+                saveFiles(files);
+                render();
+                uploadInput.value = '';
+            };
 
             newFileBtn.addEventListener('click', () => {
                 const name = prompt('Enter filename (e.g., notes.txt):');
@@ -715,7 +843,7 @@
                         alert('File already exists!');
                         return;
                     }
-                    files[name] = ''; // New file with empty content
+                    files[name] = { type: 'text/plain', content: '' };
                     saveFiles(files);
                     render();
                 }
@@ -724,8 +852,15 @@
             deleteFileBtn.addEventListener('click', () => {
                 if (selectedFile && confirm(`Are you sure you want to delete ${selectedFile}?`)) {
                     const files = getFiles();
+                    const fileData = files[selectedFile];
+                    if (fileData && fileData.url && fileData.url.startsWith('blob:')) {
+                        URL.revokeObjectURL(fileData.url);
+                    }
                     delete files[selectedFile];
                     saveFiles(files);
+                    previewTitle.innerText = 'Select a file';
+                    previewContent.innerHTML = '';
+                    deleteFileBtn.style.display = 'none';
                     render();
                 }
             });
@@ -844,6 +979,49 @@
             };
         }
 
+        function loadNotes(container, data) {
+            if (!data || !data.filename) {
+                container.innerHTML = 'No file specified.';
+                return;
+            }
+            container.innerHTML = `
+                <div style="display:flex; flex-direction:column; height:100%;">
+                    <div style="padding-bottom:5px; margin-bottom:5px; border-bottom:1px solid #444; display:flex; justify-content:space-between; align-items:center;">
+                        <h3 style="margin:0;">${data.filename}</h3>
+                        <button class="app-btn" id="notes-save-btn">Save</button>
+                    </div>
+                    <textarea id="notes-content" style="flex:1; resize:none; user-select:text;">${data.content || ''}</textarea>
+                </div>
+            `;
+
+            const saveBtn = container.querySelector('#notes-save-btn');
+            const contentArea = container.querySelector('#notes-content');
+
+            saveBtn.onclick = () => {
+                const files = JSON.parse(localStorage.getItem('d4sh-fs') || '{}');
+                if (files[data.filename]) {
+                    files[data.filename].content = contentArea.value;
+                    localStorage.setItem('d4sh-fs', JSON.stringify(files));
+                    alert('File saved!');
+                }
+            };
+        }
+
+        function loadImageViewer(container, data = null) {
+            if (!data || !data.url) {
+                container.innerHTML = '<p style="text-align:center; padding:20px;">No image file opened. Open an image from the File Explorer.</p>';
+                return;
+            }
+            // Remove default padding for this app
+            container.style.padding = '0';
+            container.innerHTML = `
+                <div class="image-viewer-container">
+                    <img src="${data.url}">
+                </div>
+            `;
+        }
+
+
         async function loadSysInfo(container) {
             container.innerHTML = '<h3>System Information</h3><ul id="sysinfo-list"></ul>';
             const list = container.querySelector('#sysinfo-list');
@@ -899,15 +1077,17 @@
             };
         }
 
-        function loadVideoPlayer(container) {
-            container.innerHTML = `
-                <div class="media-container">
-                    <video controls style="width:100%; height:100%;">
-                        <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video>
-                </div>
-            `;
+        function loadVideoPlayer(container, data = null) {
+            const videoSrc = data?.url || "https://www.w3schools.com/html/mov_bbb.mp4";
+            container.innerHTML = `<div class="media-container"></div>`;
+            const mediaContainer = container.querySelector('.media-container');
+            
+            const video = document.createElement('video');
+            video.controls = true;
+            video.style.width = '100%';
+            video.style.height = '100%';
+            video.src = videoSrc;
+            mediaContainer.appendChild(video);
         }
 
         function loadMarkdown(container) {
@@ -937,17 +1117,29 @@
             });
         }
 
-        function loadMusicPlayer(container, appId) {
+        function loadMusicPlayer(container, appId, data = null) {
+            if (audioContexts[appId]) {
+                audioContexts[appId].close();
+                delete audioContexts[appId];
+            }
+
+            const audioSrc = data?.url || "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
             container.innerHTML = `
                 <div class="media-container">
                     <canvas id="viz-${appId}" class="music-visualizer"></canvas>
-                    <audio id="audio-${appId}" controls crossorigin="anonymous" style="width:100%; margin-top:auto;">
-                        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mp3">
-                    </audio>
                 </div>
             `;
+            const mediaContainer = container.querySelector('.media-container');
 
-            const audio = container.querySelector(`#audio-${appId}`);
+            const audio = document.createElement('audio');
+            audio.id = `audio-${appId}`;
+            audio.controls = true;
+            audio.crossOrigin = 'anonymous';
+            audio.style.width = '100%';
+            audio.style.marginTop = 'auto';
+            audio.src = audioSrc;
+            mediaContainer.appendChild(audio);
+            
             const canvas = container.querySelector(`#viz-${appId}`);
             const ctx = canvas.getContext('2d');
 
@@ -967,7 +1159,8 @@
                     const dataArray = new Uint8Array(bufferLength);
 
                     const renderFrame = () => {
-                        if (!document.getElementById(`win-${appId}`)) return; // Stop if window closed
+                        if (!document.getElementById(`win-${appId}`)) return;
+                        if (audioContexts[appId] !== actx) return;
                         requestAnimationFrame(renderFrame);
                         analyser.getByteFrequencyData(dataArray);
                         
@@ -1098,19 +1291,22 @@
             };
         }
 
-        function loadPDFViewer(container) {
+        function loadPDFViewer(container, data = null) {
             container.innerHTML = `
                 <div class="pdf-container">
                     <div style="padding: 5px; background: rgba(0,0,0,0.2); border-bottom: 1px solid #444;">
                         <input type="file" id="pdf-upload" accept="application/pdf" style="width: auto;">
                     </div>
-                    <iframe id="pdf-frame" src=""></iframe>
                 </div>
             `;
+            const pdfContainer = container.querySelector('.pdf-container');
             
-            const input = container.querySelector('#pdf-upload');
-            const frame = container.querySelector('#pdf-frame');
+            const frame = document.createElement('iframe');
+            frame.id = 'pdf-frame';
+            frame.src = data?.url || '';
+            pdfContainer.appendChild(frame);
 
+            const input = container.querySelector('#pdf-upload');
             input.onchange = () => {
                 if (input.files && input.files[0]) {
                     const url = URL.createObjectURL(input.files[0]);
@@ -1179,10 +1375,44 @@
                     <div class="settings-group">
                         <button class="app-btn" id="sync-btn" disabled onclick="syncToDrive()">⬆ Sync Local to Cloud</button>
                         <button class="app-btn" id="restore-btn" disabled onclick="restoreFromDrive()">⬇ Restore Cloud to Local</button>
+                        <div id="sync-progress-container" style="display:none; margin-top: 10px;">
+                            <div style="background: #333; height: 10px; border-radius: 5px; overflow: hidden;">
+                                <div id="sync-progress-bar" style="width: 0%; height: 100%; background: var(--text-color); transition: width 0.2s;"></div>
+                            </div>
+                            <div id="sync-status-text" style="font-size: 12px; text-align: center; margin-top: 5px; color: #aaa;"></div>
+                        </div>
+                    </div>
+
+                    <h3>About</h3>
+                    <div class="settings-group">
+                        <p id="matrix-credits" class="matrix-text">Made by Darshan</p>
                     </div>
                 </div>
             `;
             checkAuth();
+
+            const credits = container.querySelector('#matrix-credits');
+            const originalText = "Made by Darshan";
+            const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890@#$%^&*";
+            let matrixInterval = null;
+
+            const runMatrix = () => {
+                let iteration = 0;
+                clearInterval(matrixInterval);
+                
+                matrixInterval = setInterval(() => {
+                    credits.innerText = originalText.split("").map((letter, index) => {
+                        if(index < iteration) return originalText[index];
+                        return letters[Math.floor(Math.random() * letters.length)];
+                    }).join("");
+                    
+                    if(iteration >= originalText.length) clearInterval(matrixInterval);
+                    iteration += 1 / 3;
+                }, 30);
+            };
+
+            credits.onmouseover = runMatrix;
+            runMatrix();
         }
 
         window.saveWallpaper = (url) => {
@@ -1237,13 +1467,46 @@
         }
 
         async function syncToDrive() {
-            const data = {};
-            for(let i=0; i<localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if(key.startsWith('d4sh-')) data[key] = localStorage.getItem(key);
+            const progressContainer = document.getElementById('sync-progress-container');
+            const progressBar = document.getElementById('sync-progress-bar');
+            const statusText = document.getElementById('sync-status-text');
+            
+            if(progressContainer) {
+                progressContainer.style.display = 'block';
+                progressBar.style.width = '0%';
+                statusText.innerText = 'Preparing files...';
+            }
+
+            const backupData = {};
+            const keys = [];
+            for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+
+            for (const key of keys) {
+                if (key.startsWith('d4sh-')) {
+                    if (key === 'd4sh-fs') {
+                        const allFiles = JSON.parse(localStorage.getItem('d4sh-fs') || '{}');
+                        const persistentFs = {};
+                        await Promise.all(Object.keys(allFiles).map(async (filename) => {
+                            const file = allFiles[filename];
+                            if (file.url && file.url.startsWith('blob:')) {
+                                try {
+                                    const blob = await fetch(file.url).then(r => r.blob());
+                                    const dataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+                                    persistentFs[filename] = { ...file, url: dataUrl };
+                                } catch (e) { console.error('Backup failed for', filename); }
+                            } else {
+                                persistentFs[filename] = file;
+                            }
+                        }));
+                        backupData[key] = JSON.stringify(persistentFs);
+                    } else {
+                        backupData[key] = localStorage.getItem(key);
+                    }
+                }
+                if(progressBar) progressBar.style.width = '30%'; // Preparation done
             }
             
-            const file = new Blob([JSON.stringify(data)], {type: 'application/json'});
+            const file = new Blob([JSON.stringify(backupData)], {type: 'application/json'});
             const metadata = { name: BACKUP_FILENAME, mimeType: 'application/json' };
             const accessToken = gapi.client.getToken().access_token;
             const form = new FormData();
@@ -1257,16 +1520,52 @@
             
             const method = driveFileId ? 'PATCH' : 'POST';
 
-            fetch(url, { method, headers: { 'Authorization': 'Bearer ' + accessToken }, body: form })
-                .then(res => res.json())
-                .then(val => {
+            const xhr = new XMLHttpRequest();
+            xhr.open(method, url);
+            xhr.setRequestHeader('Authorization', 'Bearer ' + accessToken);
+            
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable && progressBar) {
+                    const percentComplete = (e.loaded / e.total) * 70 + 30;
+                    progressBar.style.width = percentComplete + '%';
+                    statusText.innerText = `Uploading: ${Math.round((e.loaded / e.total) * 100)}%`;
+                }
+            };
+
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    const val = JSON.parse(xhr.responseText);
                     if(val.id) driveFileId = val.id;
+                    if(progressBar) progressBar.style.width = '100%';
+                    if(statusText) statusText.innerText = 'Sync Complete!';
+                    setTimeout(() => {
+                        if(progressContainer) progressContainer.style.display = 'none';
+                    }, 2000);
                     alert('Sync Successful!');
-                });
+                } else {
+                    if(statusText) statusText.innerText = 'Upload Failed';
+                    alert('Sync Failed: ' + xhr.statusText);
+                }
+            };
+
+            xhr.onerror = () => {
+                if(statusText) statusText.innerText = 'Network Error';
+                alert('Sync Failed: Network Error');
+            };
+
+            xhr.send(form);
         }
 
         async function restoreFromDrive() {
             const res = await gapi.client.drive.files.get({ fileId: driveFileId, alt: 'media' });
+
+            const currentFiles = JSON.parse(localStorage.getItem('d4sh-fs') || '{}');
+            for (const filename in currentFiles) {
+                if (currentFiles[filename].url && currentFiles[filename].url.startsWith('blob:')) {
+                    URL.revokeObjectURL(currentFiles[filename].url);
+                }
+            }
+
             const data = res.result; // gapi auto-parses JSON
             Object.keys(data).forEach(k => localStorage.setItem(k, data[k]));
             alert('Restored! Reloading...');
