@@ -33,6 +33,7 @@
             width: 100%;
             position: relative;
             overflow: hidden;
+            padding-right: 260px;
         }
 
         /* Icons on Desktop */
@@ -194,6 +195,8 @@
         /* Paint App */
         .paint-toolbar { display: flex; align-items: center; gap: 10px; padding-bottom: 5px; border-bottom: 1px solid #444; margin-bottom: 5px; }
         .paint-toolbar input[type="color"] { width: 30px; height: 30px; padding: 0; border: none; background: none; }
+        .paint-palette { display: flex; gap: 2px; }
+        .paint-color-swatch { width: 20px; height: 20px; border: 1px solid #555; cursor: pointer; }
 
         /* Camera & Video */
         .media-container { width: 100%; height: 100%; display: flex; flex-direction: column; background: #000; }
@@ -232,6 +235,41 @@
             max-height: 100%;
             object-fit: contain;
         }
+
+        /* Weather Widget */
+        #weather-widget {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 220px;
+            background: rgba(22, 33, 62, 0.6);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 15px;
+            color: white;
+            z-index: 1;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+            user-select: none;
+        }
+        #weather-widget:hover { transform: scale(1.02); background: rgba(22, 33, 62, 0.8); }
+        .weather-main { display: flex; align-items: center; justify-content: space-between; }
+        .weather-temp { font-size: 36px; font-weight: 300; }
+        .weather-icon { font-size: 32px; }
+        .weather-details { text-align: right; }
+        .weather-desc { font-size: 14px; color: #ddd; text-transform: capitalize; }
+        .weather-loc { font-size: 12px; color: #aaa; margin-top: 8px; display: flex; align-items: center; gap: 5px; }
+
+        /* Calendar App */
+        .calendar-container { height: 100%; display: flex; flex-direction: column; }
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(0,0,0,0.2); }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; flex: 1; text-align: center; align-content: start; }
+        .calendar-day-name { font-weight: bold; padding: 5px; background: rgba(255,255,255,0.05); font-size: 0.9em; }
+        .calendar-date { padding: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 4px; }
+        .calendar-date:hover { background: rgba(255,255,255,0.1); }
+        .calendar-date.today { background: var(--text-color); color: white; font-weight: bold; }
+        .calendar-date.empty { background: transparent; cursor: default; }
 
         /* Matrix Text Effect */
         .matrix-text {
@@ -326,6 +364,7 @@
             { id: 'markdown', name: 'Markdown', icon: '📝', type: 'app' },
             { id: 'music', name: 'Music Player', icon: '🎵', type: 'app' },
             { id: 'clock', name: 'Clock', icon: '⏰', type: 'app' },
+            { id: 'calendar', name: 'Calendar', icon: '📅', type: 'app' },
             { id: 'pdf', name: 'PDF Viewer', icon: '📄', type: 'app' },
             { id: 'snake', name: 'Snake', icon: '🐍', type: 'game' },
             { id: 'dino', name: 'Chrome Dino', icon: '🦖', type: 'game' },
@@ -363,6 +402,7 @@
                 startMenu.style.display = 'none';
             });
             loadPreferences();
+            loadWeatherWidget();
         }
 
         function toggleStartMenu() {
@@ -402,6 +442,80 @@
                 root.style.setProperty('--glass', 'rgba(22, 33, 62, 0.9)');
             }
             localStorage.setItem('d4sh-theme', theme);
+        }
+
+        // --- WEATHER WIDGET ---
+        function loadWeatherWidget() {
+            const desktop = document.getElementById('desktop');
+            const widget = document.createElement('div');
+            widget.id = 'weather-widget';
+            widget.innerHTML = '<div style="text-align:center; font-size:12px; color:#aaa;">Loading Weather...</div>';
+            desktop.appendChild(widget);
+
+            const updateWidget = (temp, code, city) => {
+                const weatherCodes = {
+                    0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
+                    45: 'Fog', 48: 'Depositing rime fog',
+                    51: 'Drizzle: Light', 53: 'Drizzle: Moderate', 55: 'Drizzle: Dense',
+                    61: 'Rain: Slight', 63: 'Rain: Moderate', 65: 'Rain: Heavy',
+                    71: 'Snow: Slight', 73: 'Snow: Moderate', 75: 'Snow: Heavy',
+                    95: 'Thunderstorm: Slight or moderate', 99: 'Thunderstorm with slight and heavy hail'
+                };
+                const desc = weatherCodes[code] || 'Unknown';
+                const icon = getIcon(code);
+
+                widget.innerHTML = `
+                    <div class="weather-main">
+                        <div class="weather-icon">${icon}</div>
+                        <div class="weather-details">
+                            <div class="weather-temp">${Math.round(temp)}°C</div>
+                            <div class="weather-desc">${desc}</div>
+                        </div>
+                    </div>
+                    <div class="weather-loc">📍 ${city}</div>
+                `;
+            };
+
+            const getIcon = (code) => {
+                if(code === 0) return '☀️';
+                if(code >= 1 && code <= 3) return '⛅';
+                if(code >= 45 && code <= 48) return '🌫️';
+                if(code >= 51 && code <= 67) return '🌧️';
+                if(code >= 71 && code <= 77) return '❄️';
+                if(code >= 95) return '⚡';
+                return '🌡️';
+            };
+
+            const fetchWeather = async (lat, lon, city) => {
+                try {
+                    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+                    const data = await res.json();
+                    updateWidget(data.current_weather.temperature, data.current_weather.weathercode, city);
+                } catch (e) { widget.innerHTML = '<div style="text-align:center; color:#e94560;">Weather Unavailable</div>'; }
+            };
+
+            const useIpLocation = () => {
+                fetch('https://get.geojs.io/v1/ip/geo.json')
+                    .then(r => r.json())
+                    .then(d => fetchWeather(d.latitude, d.longitude, d.city))
+                    .catch(() => widget.innerHTML = '<div style="text-align:center; color:#aaa;">Location Unavailable</div>');
+            };
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    async pos => {
+                        const { latitude, longitude } = pos.coords;
+                        try {
+                            const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+                            const data = await res.json();
+                            fetchWeather(latitude, longitude, data.city || data.locality || "Local Weather");
+                        } catch { fetchWeather(latitude, longitude, "Local Weather"); }
+                    },
+                    () => useIpLocation()
+                );
+            } else {
+                useIpLocation();
+            }
         }
 
         // --- GLOBAL STATE & CLEANUP HELPERS ---
@@ -577,6 +691,7 @@
             else if (app.id === 'markdown') loadMarkdown(container);
             else if (app.id === 'music') loadMusicPlayer(container, app.id, data);
             else if (app.id === 'clock') loadClock(container, app.id);
+            else if (app.id === 'calendar') loadCalendar(container);
             else if (app.id === 'pdf') loadPDFViewer(container, data);
             else if (app.id === 'snake') loadSnake(container, app.id);
             else if (app.id === 'dino') loadDino(container, app.id);
@@ -925,7 +1040,12 @@
                 <div style="display:flex; flex-direction:column; height:100%;">
                     <div class="paint-toolbar">
                         <input type="color" id="paint-color" value="#e94560" title="Color">
+                        <div id="paint-palette" class="paint-palette"></div>
                         <input type="range" id="paint-size" min="1" max="50" value="5" title="Brush Size">
+                        <button class="app-btn" id="tool-brush" style="background:#fff; color:#000">Brush</button>
+                        <button class="app-btn" id="tool-eraser">Eraser</button>
+                        <button class="app-btn" id="tool-rect">Rect</button>
+                        <button class="app-btn" id="tool-circle">Circle</button>
                         <button class="app-btn" onclick="clearCanvas()">Clear</button>
                         <button class="app-btn" onclick="saveCanvas()">Save</button>
                     </div>
@@ -937,6 +1057,39 @@
             const ctx = canvas.getContext('2d');
             const colorPicker = container.querySelector('#paint-color');
             const sizePicker = container.querySelector('#paint-size');
+            const paletteContainer = container.querySelector('#paint-palette');
+            
+            let currentTool = 'brush';
+            const tools = ['brush', 'eraser', 'rect', 'circle'];
+            
+            const setTool = (tool) => {
+                currentTool = tool;
+                tools.forEach(t => {
+                    const btn = container.querySelector(`#tool-${t}`);
+                    if (t === tool) {
+                        btn.style.background = '#fff';
+                        btn.style.color = '#000';
+                    } else {
+                        btn.style.background = '';
+                        btn.style.color = '';
+                    }
+                });
+            };
+
+            tools.forEach(t => {
+                container.querySelector(`#tool-${t}`).onclick = () => setTool(t);
+            });
+            
+            colorPicker.oninput = () => { if(currentTool === 'eraser') setTool('brush'); };
+
+            const colors = ['#000000', '#ffffff', '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#e94560'];
+            colors.forEach(c => {
+                const swatch = document.createElement('div');
+                swatch.className = 'paint-color-swatch';
+                swatch.style.backgroundColor = c;
+                swatch.onclick = () => { colorPicker.value = c; if(currentTool === 'eraser') setTool('brush'); };
+                paletteContainer.appendChild(swatch);
+            });
 
             // Set canvas resolution to match display size
             setTimeout(() => {
@@ -947,21 +1100,43 @@
             }, 0);
 
             let isDrawing = false;
-            let lastX = 0; let lastY = 0;
+            let startX = 0; let startY = 0;
+            let snapshot;
 
             const start = (e) => {
                 isDrawing = true;
-                [lastX, lastY] = [e.offsetX, e.offsetY];
+                startX = e.offsetX;
+                startY = e.offsetY;
+                ctx.beginPath();
+                ctx.lineWidth = sizePicker.value;
+                ctx.strokeStyle = currentTool === 'eraser' ? '#ffffff' : colorPicker.value;
+                
+                if (currentTool === 'rect' || currentTool === 'circle') {
+                    snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                } else {
+                    ctx.moveTo(startX, startY);
+                }
             };
             const draw = (e) => {
                 if (!isDrawing) return;
-                ctx.beginPath();
-                ctx.moveTo(lastX, lastY);
-                ctx.lineTo(e.offsetX, e.offsetY);
-                ctx.strokeStyle = colorPicker.value;
-                ctx.lineWidth = sizePicker.value;
-                ctx.stroke();
-                [lastX, lastY] = [e.offsetX, e.offsetY];
+                
+                if (currentTool === 'brush' || currentTool === 'eraser') {
+                    ctx.lineTo(e.offsetX, e.offsetY);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(e.offsetX, e.offsetY);
+                } else if (currentTool === 'rect') {
+                    ctx.putImageData(snapshot, 0, 0);
+                    ctx.beginPath();
+                    ctx.rect(startX, startY, e.offsetX - startX, e.offsetY - startY);
+                    ctx.stroke();
+                } else if (currentTool === 'circle') {
+                    ctx.putImageData(snapshot, 0, 0);
+                    ctx.beginPath();
+                    const radius = Math.sqrt(Math.pow(e.offsetX - startX, 2) + Math.pow(e.offsetY - startY, 2));
+                    ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
+                    ctx.stroke();
+                }
             };
             const stop = () => isDrawing = false;
 
@@ -1289,6 +1464,66 @@
                 if(tmInterval) clearInterval(tmInterval);
                 tmInterval = null; tmRemaining = 0; tmDisplay.innerText = '00:00:00'; tmBtn.innerText = 'Start';
             };
+        }
+
+        function loadCalendar(container) {
+            container.innerHTML = `
+                <div class="calendar-container">
+                    <div class="calendar-header">
+                        <button class="app-btn" id="cal-prev">&lt;</button>
+                        <h3 id="cal-month-year" style="margin:0"></h3>
+                        <button class="app-btn" id="cal-next">&gt;</button>
+                    </div>
+                    <div class="calendar-grid" id="cal-grid"></div>
+                </div>
+            `;
+
+            let date = new Date();
+            let currMonth = date.getMonth();
+            let currYear = date.getFullYear();
+
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            const header = container.querySelector('#cal-month-year');
+            const grid = container.querySelector('#cal-grid');
+
+            const render = () => {
+                header.innerText = `${monthNames[currMonth]} ${currYear}`;
+                grid.innerHTML = '';
+
+                // Day names
+                ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(day => {
+                    grid.innerHTML += `<div class="calendar-day-name">${day}</div>`;
+                });
+
+                const firstDay = new Date(currYear, currMonth, 1).getDay();
+                const daysInMonth = new Date(currYear, currMonth + 1, 0).getDate();
+                const today = new Date();
+
+                // Empty slots
+                for (let i = 0; i < firstDay; i++) {
+                    grid.innerHTML += `<div class="calendar-date empty"></div>`;
+                }
+
+                // Days
+                for (let i = 1; i <= daysInMonth; i++) {
+                    const isToday = i === today.getDate() && currMonth === today.getMonth() && currYear === today.getFullYear();
+                    grid.innerHTML += `<div class="calendar-date ${isToday ? 'today' : ''}">${i}</div>`;
+                }
+            };
+
+            container.querySelector('#cal-prev').onclick = () => {
+                currMonth--;
+                if (currMonth < 0) { currMonth = 11; currYear--; }
+                render();
+            };
+
+            container.querySelector('#cal-next').onclick = () => {
+                currMonth++;
+                if (currMonth > 11) { currMonth = 0; currYear++; }
+                render();
+            };
+
+            render();
         }
 
         function loadPDFViewer(container, data = null) {
