@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D4rsh OS</title>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --taskbar-color: #16213e;
+            --window-bg: #0f3460;
+            --text-color: #e94560;
+            --white: #ffffff;
+            --glass: rgba(22, 33, 62, 0.9);
+        }
+
+        * { box-sizing: border-box; user-select: none; }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            height: 100vh;
+            width: 100vw;
+            color: var(--white);
+        }
+
+        /* Desktop Area */
+        #desktop {
+            height: calc(100vh - 40px);
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Icons on Desktop */
+        .desktop-icon {
+            width: 80px;
+            height: 90px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background 0.2s;
+            float: left;
+            text-align: center;
+            font-size: 12px;
+            text-shadow: 1px 1px 2px black;
+        }
+
+        .desktop-icon:hover { background: rgba(255,255,255,0.1); }
+        .desktop-icon span { font-size: 24px; margin-bottom: 5px; }
+
+        /* Window Styles */
+        .window {
+            position: absolute;
+            background: var(--window-bg);
+            border: 1px solid #333;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            min-width: 300px;
+            min-height: 200px;
+            resize: both; /* Native CSS Resizing */
+            overflow: hidden;
+        }
+
+        .window.maximized {
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            resize: none;
+            border-radius: 0;
+        }
+
+        .title-bar {
+            height: 30px;
+            background: rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 10px;
+            cursor: grab;
+        }
+
+        .title-bar:active { cursor: grabbing; }
+
+        .window-controls button {
+            background: none;
+            border: none;
+            color: var(--white);
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+        
+        .window-controls button:hover { color: var(--text-color); }
+
+        .window-content {
+            flex: 1;
+            padding: 10px;
+            overflow: auto;
+            background: rgba(255,255,255,0.05);
+            position: relative;
+            cursor: auto;
+        }
+
+        /* Taskbar */
+        #taskbar {
+            height: 40px;
+            background: var(--taskbar-color);
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            border-top: 1px solid #333;
+            z-index: 9999;
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+        }
+
+        #start-btn {
+            background: var(--text-color);
+            border: none;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        .taskbar-item {
+            padding: 5px 10px;
+            margin-right: 5px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .taskbar-item.active { background: rgba(255,255,255,0.2); border-bottom: 2px solid var(--text-color); }
+
+        /* App Specific Styles */
+        input, textarea {
+            width: 100%;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid #444;
+            color: white;
+            padding: 5px;
+            margin-bottom: 5px;
+        }
+
+        button.app-btn {
+            background: var(--text-color);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+
+        ul { list-style: none; padding: 0; }
+        #todo-list li { background: rgba(0,0,0,0.2); padding: 5px; margin-bottom: 2px; display: flex; justify-content: space-between; }
+        
+        /* File Explorer */
+        .file-explorer-container { display: flex; height: 100%; gap: 10px; }
+        .file-list-panel { width: 150px; border-right: 1px solid #444; padding-right: 10px; display: flex; flex-direction: column; }
+        .file-list-panel ul { flex: 1; overflow-y: auto; }
+        .file-list-panel li { cursor: pointer; padding: 5px; border-radius: 3px; margin-bottom: 2px; }
+        .file-list-panel li:hover { background: rgba(255,255,255,0.1); }
+        .file-preview-panel { flex: 1; display: flex; flex-direction: column; }
+        .file-preview-panel textarea { flex: 1; resize: none; background: rgba(0,0,0,0.1); user-select: text; }
+
+        /* Calculator */
+        .calculator-container { height: 100%; display: flex; flex-direction: column; }
+        #calc-display { text-align: right; font-size: 1.5em; padding: 10px; margin-bottom: 10px; }
+        .calculator-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; flex: 1; }
+        .calc-btn { background: #333; border: none; color: white; font-size: 1.2em; cursor: pointer; border-radius: 4px; }
+        .calc-btn:hover { background: #444; }
+        .calc-btn.op { background: #555; }
+        .calc-btn.clear { background: var(--text-color); }
+        .calc-btn.equals { background: #1f8ad6; grid-column: 4; grid-row: 4 / span 2; }
+        .calc-btn.plus { grid-row: 2 / span 2; }
+        .calc-btn.zero { grid-column: 1 / span 2; }
+
+        /* Paint App */
+        .paint-toolbar { display: flex; align-items: center; gap: 10px; padding-bottom: 5px; border-bottom: 1px solid #444; margin-bottom: 5px; }
+        .paint-toolbar input[type="color"] { width: 30px; height: 30px; padding: 0; border: none; background: none; }
+
+        /* Camera & Video */
+        .media-container { width: 100%; height: 100%; display: flex; flex-direction: column; background: #000; }
+        .media-container video { width: 100%; flex: 1; object-fit: contain; }
+        .camera-controls { padding: 10px; display: flex; justify-content: center; background: #222; }
+
+        /* Markdown Editor */
+        .markdown-container { display: flex; height: 100%; gap: 10px; }
+        .markdown-container textarea { flex: 1; resize: none; background: rgba(0,0,0,0.3); color: white; border: 1px solid #444; padding: 10px; font-family: monospace; }
+        .markdown-container #md-preview { flex: 1; overflow-y: auto; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid #444; word-wrap: break-word; }
+        .markdown-container #md-preview img { max-width: 100%; }
+
+        /* Music Player */
+        .music-visualizer { width: 100%; flex: 1; background: #000; }
+
+        canvas { background: #000; display: block; margin: 0 auto; border: 1px solid #444; }
+
+        /* Helper for text selection in inputs */
+        .window-content input, .window-content textarea { user-select: text; }
+
+        /* Start Menu */
+        #start-menu {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            width: 250px;
+            background: rgba(22, 33, 62, 0.95);
+            border: 1px solid #333;
+            border-bottom: none;
+            border-top-right-radius: 8px;
+            display: none;
+            flex-direction: column;
+            z-index: 10000;
+            padding: 10px;
+            box-shadow: 5px -5px 15px rgba(0,0,0,0.5);
+        }
+
+        .start-menu-item {
+            padding: 10px;
+            cursor: pointer;
+            color: white;
+            display: flex;
+            align-items: center;
+            border-radius: 4px;
+        }
+        .start-menu-item:hover { background: rgba(255,255,255,0.1); }
+        .start-menu-item span { margin-right: 10px; font-size: 18px; }
+
+        /* Content Resizing Helpers */
+        .game-container { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
+        .game-container canvas { max-width: 100%; max-height: 100%; object-fit: contain; image-rendering: pixelated; }
+        .diary-container { display: flex; flex-direction: column; height: 100%; }
+        .diary-container textarea { flex: 1; resize: none; }
+
+        /* Settings App */
+        .settings-container { padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .settings-group { background: rgba(0,0,0,0.2); padding: 15px; border-radius: 5px; }
+    </style>
+    <!-- Google API Scripts -->
+    <script src="https://apis.google.com/js/api.js" async defer onload="gapiLoaded()"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer onload="gisLoaded()"></script>
+</head>
+<body>
+
+    <div id="desktop">
+        <!-- Icons generated by JS -->
+    </div>
+
+    <div id="start-menu">
+        <!-- Items generated by JS -->
+    </div>
+
+    <div id="taskbar">
+        <button id="start-btn" onclick="toggleStartMenu()">D4rsh</button>
+        <div id="taskbar-apps" style="display:flex;"></div>
+        <div style="margin-left: auto; font-size: 12px;" id="clock">00:00</div>
+    </div>
+
+    <script>
+        // --- OS STATE ---
+        let zIndexCounter = 100;
+        const apps = [
+            { id: 'todo', name: 'To-Do List', icon: '📝', type: 'app' },
+            { id: 'diary', name: 'Daily Diary', icon: '📔', type: 'app' },
+            { id: 'log', name: 'Hourly Log', icon: '⏱️', type: 'app' },
+            { id: 'files', name: 'File Explorer', icon: '📁', type: 'app' },
+            { id: 'calculator', name: 'Calculator', icon: '🧮', type: 'app' },
+            { id: 'settings', name: 'Settings', icon: '⚙️', type: 'app' },
+            { id: 'paint', name: 'Paint', icon: '🎨', type: 'app' },
+            { id: 'sysinfo', name: 'System Info', icon: 'ℹ️', type: 'app' },
+            { id: 'camera', name: 'Camera', icon: '📷', type: 'app' },
+            { id: 'video', name: 'Video Player', icon: '🎥', type: 'app' },
+            { id: 'markdown', name: 'Markdown', icon: '📝', type: 'app' },
+            { id: 'music', name: 'Music Player', icon: '🎵', type: 'app' },
+            { id: 'snake', name: 'Snake', icon: '🐍', type: 'game' },
+            { id: 'dino', name: 'Chrome Dino', icon: '🦖', type: 'game' },
+            { id: 'flappy', name: 'Flappy Bird', icon: '🐦', type: 'game' }
+        ];
+
+        // --- INITIALIZATION ---
+        function init() {
+            const desktop = document.getElementById('desktop');
+            const startMenu = document.getElementById('start-menu');
+            
+            apps.forEach(app => {
+                const icon = document.createElement('div');
+                icon.className = 'desktop-icon';
+                icon.innerHTML = `<span>${app.icon}</span>${app.name}`;
+                icon.onclick = () => openWindow(app);
+                desktop.appendChild(icon);
+
+                // Start Menu Item
+                const item = document.createElement('div');
+                item.className = 'start-menu-item';
+                item.innerHTML = `<span>${app.icon}</span> ${app.name}`;
+                item.onclick = () => {
+                    openWindow(app);
+                    toggleStartMenu();
+                };
+                startMenu.appendChild(item);
+            });
+
+            setInterval(updateClock, 1000);
+            updateClock();
+
+            // Close start menu when clicking desktop
+            desktop.addEventListener('mousedown', () => {
+                startMenu.style.display = 'none';
+            });
+            loadPreferences();
+        }
+
+        function toggleStartMenu() {
+            const menu = document.getElementById('start-menu');
+            menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex';
+        }
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+
+        // --- PERSONALIZATION ---
+        function loadPreferences() {
+            const theme = localStorage.getItem('d4sh-theme') || 'dark';
+            applyTheme(theme);
+            
+            const wallpaper = localStorage.getItem('d4sh-wallpaper');
+            if (wallpaper) document.body.style.background = wallpaper.startsWith('http') || wallpaper.startsWith('data') ? `url(${wallpaper}) no-repeat center center / cover` : wallpaper;
+        }
+
+        function applyTheme(theme) {
+            const root = document.documentElement;
+            if (theme === 'light') {
+                root.style.setProperty('--bg-color', '#f0f2f5');
+                root.style.setProperty('--taskbar-color', '#e4e6eb');
+                root.style.setProperty('--window-bg', '#ffffff');
+                root.style.setProperty('--text-color', '#007bff');
+                root.style.setProperty('--white', '#1c1e21');
+                root.style.setProperty('--glass', 'rgba(255, 255, 255, 0.9)');
+            } else {
+                root.style.setProperty('--bg-color', '#1a1a2e');
+                root.style.setProperty('--taskbar-color', '#16213e');
+                root.style.setProperty('--window-bg', '#0f3460');
+                root.style.setProperty('--text-color', '#e94560');
+                root.style.setProperty('--white', '#ffffff');
+                root.style.setProperty('--glass', 'rgba(22, 33, 62, 0.9)');
+            }
+            localStorage.setItem('d4sh-theme', theme);
+        }
+
+        // --- WINDOW MANAGER ---
+        function openWindow(app) {
+            // Check if already open
+            if (document.getElementById(`win-${app.id}`)) {
+                focusWindow(document.getElementById(`win-${app.id}`));
+                return;
+            }
+
+            const win = document.createElement('div');
+            win.className = 'window';
+            win.id = `win-${app.id}`;
+            win.style.left = (50 + (Math.random() * 50)) + 'px';
+            win.style.top = (50 + (Math.random() * 50)) + 'px';
+            win.style.width = app.type === 'game' ? '420px' : '350px';
+            win.style.height = app.type === 'game' ? '450px' : '400px';
+            win.style.zIndex = ++zIndexCounter;
+
+            win.innerHTML = `
+                <div class="title-bar" onmousedown="startDrag(event, '${win.id}')">
+                    <span>${app.icon} ${app.name}</span>
+                    <div class="window-controls">
+                        <button onclick="minimizeWindow('${win.id}')">_</button>
+                        <button onclick="toggleMaximize('${win.id}')">□</button>
+                        <button onclick="closeWindow('${win.id}')">×</button>
+                    </div>
+                </div>
+                <div class="window-content" id="content-${app.id}"></div>
+            `;
+
+            // Focus on click
+            win.addEventListener('mousedown', () => focusWindow(win));
+
+            document.getElementById('desktop').appendChild(win);
+            addToTaskbar(app);
+            loadAppContent(app, `content-${app.id}`);
+        }
+
+        function closeWindow(id) {
+            const win = document.getElementById(id);
+            if (win) {
+                // Stop game loops if applicable
+                const appId = id.replace('win-', '');
+                if (gameIntervals[appId]) clearInterval(gameIntervals[appId]);
+                
+                // Stop media streams (Camera)
+                if (activeStreams[appId]) {
+                    activeStreams[appId].getTracks().forEach(track => track.stop());
+                    delete activeStreams[appId];
+                }
+
+                // Stop Audio Contexts (Music)
+                if (audioContexts[appId]) {
+                    audioContexts[appId].close();
+                    delete audioContexts[appId];
+                }
+
+                win.remove();
+                document.getElementById(`task-${appId}`).remove();
+            }
+        }
+
+        function focusWindow(win) {
+            win.style.zIndex = ++zIndexCounter;
+            // Highlight taskbar
+            document.querySelectorAll('.taskbar-item').forEach(el => el.classList.remove('active'));
+            const appId = win.id.replace('win-', '');
+            const taskItem = document.getElementById(`task-${appId}`);
+            if(taskItem) taskItem.classList.add('active');
+        }
+
+        function minimizeWindow(id) {
+            const win = document.getElementById(id);
+            win.style.display = 'none';
+            document.getElementById(`task-${id.replace('win-', '')}`).classList.remove('active');
+        }
+
+        function restoreWindow(id) {
+            const win = document.getElementById(`win-${id}`);
+            win.style.display = 'flex';
+            focusWindow(win);
+        }
+
+        function toggleMaximize(id) {
+            const win = document.getElementById(id);
+            win.classList.toggle('maximized');
+        }
+
+        function addToTaskbar(app) {
+            const bar = document.getElementById('taskbar-apps');
+            const item = document.createElement('div');
+            item.className = 'taskbar-item active';
+            item.id = `task-${app.id}`;
+            item.innerText = `${app.icon} ${app.name}`;
+            item.onclick = () => {
+                const win = document.getElementById(`win-${app.id}`);
+                if (win.style.display === 'none') restoreWindow(app.id);
+                else focusWindow(win);
+            };
+            bar.appendChild(item);
+        }
+
+        // --- DRAGGING LOGIC ---
+        let isDragging = false;
+        let dragOffset = { x: 0, y: 0 };
+        let currentDragWin = null;
+
+        function startDrag(e, winId) {
+            if (e.target.tagName === 'BUTTON') return; // Don't drag if clicking controls
+            const win = document.getElementById(winId);
+            if (win.classList.contains('maximized')) return;
+
+            isDragging = true;
+            currentDragWin = win;
+            dragOffset.x = e.clientX - win.offsetLeft;
+            dragOffset.y = e.clientY - win.offsetTop;
+            focusWindow(win);
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging && currentDragWin) {
+                e.preventDefault();
+                currentDragWin.style.left = (e.clientX - dragOffset.x) + 'px';
+                currentDragWin.style.top = (e.clientY - dragOffset.y) + 'px';
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            currentDragWin = null;
+        });
+
+        // --- APP CONTENT LOADERS ---
+        const gameIntervals = {};
+        const activeStreams = {};
+        const audioContexts = {};
+
+        function loadAppContent(app, containerId) {
+            const container = document.getElementById(containerId);
+            
+            if (app.id === 'todo') loadTodo(container);
+            else if (app.id === 'diary') loadDiary(container);
+            else if (app.id === 'log') loadLog(container);
+            else if (app.id === 'files') loadFileExplorer(container);
+            else if (app.id === 'calculator') loadCalculator(container);
+            else if (app.id === 'settings') loadSettings(container);
+            else if (app.id === 'paint') loadPaint(container);
+            else if (app.id === 'sysinfo') loadSysInfo(container);
+            else if (app.id === 'camera') loadCamera(container, app.id);
+            else if (app.id === 'video') loadVideoPlayer(container);
+            else if (app.id === 'markdown') loadMarkdown(container);
+            else if (app.id === 'music') loadMusicPlayer(container, app.id);
+            else if (app.id === 'snake') loadSnake(container, app.id);
+            else if (app.id === 'dino') loadDino(container, app.id);
+            else if (app.id === 'flappy') loadFlappy(container, app.id);
+        }
+
+        // --- PRODUCTIVITY APPS ---
+        
+        function loadTodo(container) {
+            container.innerHTML = `
+                <h3>To-Do List</h3>
+                <div style="display:flex">
+                    <input type="text" id="todo-input" placeholder="New Task...">
+                    <button class="app-btn" id="todo-add">+</button>
+                </div>
+                <ul id="todo-list"></ul>
+            `;
+            
+            const render = () => {
+                const tasks = JSON.parse(localStorage.getItem('d4sh-todo') || '[]');
+                const list = container.querySelector('#todo-list');
+                list.innerHTML = tasks.map((t, i) => `
+                    <li>
+                        ${t} <button onclick="removeTodo(${i})" style="background:red;border:none;color:white;cursor:pointer">x</button>
+                    </li>
+                `).join('');
+            };
+
+            container.querySelector('#todo-add').onclick = () => {
+                const val = container.querySelector('#todo-input').value;
+                if(val) {
+                    const tasks = JSON.parse(localStorage.getItem('d4sh-todo') || '[]');
+                    tasks.push(val);
+                    localStorage.setItem('d4sh-todo', JSON.stringify(tasks));
+                    container.querySelector('#todo-input').value = '';
+                    render();
+                }
+            };
+
+            // Global helper for inline onclick
+            window.removeTodo = (index) => {
+                const tasks = JSON.parse(localStorage.getItem('d4sh-todo') || '[]');
+                tasks.splice(index, 1);
+                localStorage.setItem('d4sh-todo', JSON.stringify(tasks));
+                render();
+            };
+            render();
+        }
+
+        function loadDiary(container) {
+            const today = new Date().toISOString().split('T')[0];
+            
+            container.innerHTML = `
+                <div class="diary-container">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <h3 style="margin:0;">Diary</h3>
+                        <input type="date" id="diary-date-picker" value="${today}">
+                    </div>
+                    <textarea id="diary-text"></textarea>
+                    <button class="app-btn" id="diary-save-btn">Save Entry</button>
+                </div>
+            `;
+
+            const datePicker = container.querySelector('#diary-date-picker');
+            const textArea = container.querySelector('#diary-text');
+            const saveBtn = container.querySelector('#diary-save-btn');
+
+            const loadEntry = (date) => {
+                const saved = localStorage.getItem(`d4sh-diary-${date}`) || '';
+                textArea.value = saved;
+            };
+
+            datePicker.addEventListener('change', (e) => loadEntry(e.target.value));
+            
+            saveBtn.addEventListener('click', () => {
+                const date = datePicker.value;
+                const txt = textArea.value;
+                localStorage.setItem(`d4sh-diary-${date}`, txt);
+                alert(`Diary for ${date} saved!`);
+            });
+
+            // Initial load
+            loadEntry(today);
+        }
+
+        function loadLog(container) {
+            const today = new Date().toISOString().split('T')[0];
+            container.innerHTML = `
+                <h3 style="margin-top:0;">Hourly Log</h3>
+                <input type="date" id="log-date-picker" value="${today}">
+                <div id="log-entries" style="margin-top: 10px; overflow-y: auto; flex: 1;"></div>
+            `;
+            
+            const datePicker = container.querySelector('#log-date-picker');
+            const entriesDiv = container.querySelector('#log-entries');
+
+            const renderLog = (date) => {
+                const hours = Array.from({length: 12}, (_, i) => i + 8); // 8am to 7pm
+                let html = '';
+                hours.forEach(h => {
+                    const time = `${h}:00`;
+                    const key = `d4sh-log-${date}-${time}`;
+                    const val = localStorage.getItem(key) || '';
+                    html += `
+                        <div style="display:flex; align-items:center; margin-bottom:5px;">
+                            <span style="width:50px; font-size:12px;">${time}</span>
+                            <input type="text" value="${val}" onchange="saveLog('${date}', '${time}', this.value)">
+                        </div>
+                    `;
+                });
+                entriesDiv.innerHTML = html;
+            };
+
+            datePicker.addEventListener('change', (e) => renderLog(e.target.value));
+            
+            renderLog(today);
+
+            // Make saveLog global but date-aware
+            window.saveLog = (date, time, val) => {
+                const key = `d4sh-log-${date}-${time}`;
+                localStorage.setItem(key, val);
+            };
+        }
+
+        function loadFileExplorer(container) {
+            container.innerHTML = `
+                <div class="file-explorer-container">
+                    <div class="file-list-panel">
+                        <h3>Files</h3>
+                        <ul id="file-list"></ul>
+                        <button class="app-btn" id="new-file-btn">New File</button>
+                    </div>
+                    <div class="file-preview-panel">
+                        <h3 id="preview-title">Select a file</h3>
+                        <textarea id="file-content" readonly></textarea>
+                        <button class="app-btn" id="delete-file-btn" style="display:none; background:red;">Delete</button>
+                    </div>
+                </div>
+            `;
+
+            const fileListEl = container.querySelector('#file-list');
+            const newFileBtn = container.querySelector('#new-file-btn');
+            const deleteFileBtn = container.querySelector('#delete-file-btn');
+            const previewTitle = container.querySelector('#preview-title');
+            const fileContent = container.querySelector('#file-content');
+            let selectedFile = null;
+
+            const getFiles = () => JSON.parse(localStorage.getItem('d4sh-fs') || '{}');
+            const saveFiles = (files) => localStorage.setItem('d4sh-fs', JSON.stringify(files));
+
+            const render = () => {
+                const files = getFiles();
+                fileListEl.innerHTML = Object.keys(files).map(name => `<li data-filename="${name}">${name}</li>`).join('');
+                
+                if (selectedFile && !files[selectedFile]) {
+                    selectedFile = null;
+                    previewTitle.innerText = 'Select a file';
+                    fileContent.value = '';
+                    deleteFileBtn.style.display = 'none';
+                }
+            };
+
+            fileListEl.addEventListener('click', (e) => {
+                if (e.target.tagName === 'LI') {
+                    selectedFile = e.target.dataset.filename;
+                    const files = getFiles();
+                    previewTitle.innerText = selectedFile;
+                    fileContent.value = files[selectedFile];
+                    deleteFileBtn.style.display = 'inline-block';
+                }
+            });
+
+            newFileBtn.addEventListener('click', () => {
+                const name = prompt('Enter filename (e.g., notes.txt):');
+                if (name && name.trim()) {
+                    const files = getFiles();
+                    if (files[name] !== undefined) {
+                        alert('File already exists!');
+                        return;
+                    }
+                    files[name] = ''; // New file with empty content
+                    saveFiles(files);
+                    render();
+                }
+            });
+
+            deleteFileBtn.addEventListener('click', () => {
+                if (selectedFile && confirm(`Are you sure you want to delete ${selectedFile}?`)) {
+                    const files = getFiles();
+                    delete files[selectedFile];
+                    saveFiles(files);
+                    render();
+                }
+            });
+
+            render();
+        }
+
+        function loadCalculator(container) {
+            container.innerHTML = `
+                <div class="calculator-container">
+                    <input type="text" id="calc-display" readonly>
+                    <div class="calculator-grid">
+                        <button class="calc-btn clear">C</button>
+                        <button class="calc-btn op">/</button>
+                        <button class="calc-btn op">*</button>
+                        <button class="calc-btn op">-</button>
+                        <button class="calc-btn">7</button>
+                        <button class="calc-btn">8</button>
+                        <button class="calc-btn">9</button>
+                        <button class="calc-btn op plus">+</button>
+                        <button class="calc-btn">4</button>
+                        <button class="calc-btn">5</button>
+                        <button class="calc-btn">6</button>
+                        <button class="calc-btn">1</button>
+                        <button class="calc-btn">2</button>
+                        <button class="calc-btn">3</button>
+                        <button class="calc-btn equals">=</button>
+                        <button class="calc-btn zero">0</button>
+                        <button class="calc-btn">.</button>
+                    </div>
+                </div>
+            `;
+
+            const display = container.querySelector('#calc-display');
+            const grid = container.querySelector('.calculator-grid');
+
+            grid.addEventListener('click', e => {
+                if (e.target.tagName !== 'BUTTON') return;
+                const value = e.target.innerText;
+
+                if (value === 'C') {
+                    display.value = '';
+                } else if (value === '=') {
+                    try {
+                        if (/[^0-9+\-*/.()]/.test(display.value)) {
+                            display.value = 'Error';
+                            return;
+                        }
+                        display.value = eval(display.value) || '';
+                    } catch {
+                        display.value = 'Error';
+                    }
+                } else {
+                    if (display.value === 'Error') display.value = '';
+                    display.value += value;
+                }
+            });
+        }
+
+        function loadPaint(container) {
+            container.innerHTML = `
+                <div style="display:flex; flex-direction:column; height:100%;">
+                    <div class="paint-toolbar">
+                        <input type="color" id="paint-color" value="#e94560" title="Color">
+                        <input type="range" id="paint-size" min="1" max="50" value="5" title="Brush Size">
+                        <button class="app-btn" onclick="clearCanvas()">Clear</button>
+                        <button class="app-btn" onclick="saveCanvas()">Save</button>
+                    </div>
+                    <canvas id="paint-canvas" style="flex:1; background:#fff; cursor:crosshair; width:100%; touch-action:none;"></canvas>
+                </div>
+            `;
+
+            const canvas = container.querySelector('#paint-canvas');
+            const ctx = canvas.getContext('2d');
+            const colorPicker = container.querySelector('#paint-color');
+            const sizePicker = container.querySelector('#paint-size');
+
+            // Set canvas resolution to match display size
+            setTimeout(() => {
+                canvas.width = canvas.clientWidth;
+                canvas.height = canvas.clientHeight;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+            }, 0);
+
+            let isDrawing = false;
+            let lastX = 0; let lastY = 0;
+
+            const start = (e) => {
+                isDrawing = true;
+                [lastX, lastY] = [e.offsetX, e.offsetY];
+            };
+            const draw = (e) => {
+                if (!isDrawing) return;
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(e.offsetX, e.offsetY);
+                ctx.strokeStyle = colorPicker.value;
+                ctx.lineWidth = sizePicker.value;
+                ctx.stroke();
+                [lastX, lastY] = [e.offsetX, e.offsetY];
+            };
+            const stop = () => isDrawing = false;
+
+            canvas.addEventListener('mousedown', start);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stop);
+            canvas.addEventListener('mouseout', stop);
+
+            window.clearCanvas = () => ctx.clearRect(0, 0, canvas.width, canvas.height);
+            window.saveCanvas = () => {
+                const link = document.createElement('a');
+                link.download = 'd4rsh-art.png';
+                link.href = canvas.toDataURL();
+                link.click();
+            };
+        }
+
+        async function loadSysInfo(container) {
+            container.innerHTML = '<h3>System Information</h3><ul id="sysinfo-list"></ul>';
+            const list = container.querySelector('#sysinfo-list');
+            const add = (k, v) => list.innerHTML += `<li><strong>${k}:</strong> ${v}</li>`;
+
+            add('OS Platform', navigator.platform);
+            add('User Agent', navigator.userAgent.replace(/^.*?\((.*?)\).*$/, '$1')); // Simplified UA
+            add('Language', navigator.language);
+            add('Screen Resolution', `${window.screen.width} x ${window.screen.height}`);
+            add('Color Depth', `${window.screen.colorDepth}-bit`);
+            add('Cores', navigator.hardwareConcurrency || 'Unknown');
+
+            if (navigator.getBattery) {
+                try {
+                    const battery = await navigator.getBattery();
+                    add('Battery Level', `${Math.round(battery.level * 100)}%`);
+                    add('Charging', battery.charging ? 'Yes' : 'No');
+                } catch (e) { add('Battery', 'Not Available'); }
+            }
+        }
+
+        async function loadCamera(container, appId) {
+            container.innerHTML = `
+                <div class="media-container">
+                    <video id="cam-feed" autoplay playsinline></video>
+                    <div class="camera-controls">
+                        <button class="app-btn" onclick="takePhoto()">📸 Take Photo</button>
+                    </div>
+                    <canvas id="cam-canvas" style="display:none;"></canvas>
+                </div>
+            `;
+            
+            const video = container.querySelector('#cam-feed');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                activeStreams[appId] = stream;
+            } catch (e) {
+                container.innerHTML = '<p style="padding:20px; text-align:center;">Camera access denied or unavailable.</p>';
+            }
+
+            window.takePhoto = () => {
+                const canvas = container.querySelector('#cam-canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                const link = document.createElement('a');
+                link.download = `photo-${Date.now()}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            };
+        }
+
+        function loadVideoPlayer(container) {
+            container.innerHTML = `
+                <div class="media-container">
+                    <video controls style="width:100%; height:100%;">
+                        <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            `;
+        }
+
+        function loadMarkdown(container) {
+            container.innerHTML = `
+                <div class="markdown-container">
+                    <textarea id="md-input" placeholder="# Hello World\n\nType markdown here..."></textarea>
+                    <div id="md-preview"></div>
+                </div>
+            `;
+            const input = container.querySelector('#md-input');
+            const preview = container.querySelector('#md-preview');
+
+            const parseMD = (text) => {
+                return text
+                    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                    .replace(/\*\*(.*)\*\*/gim, '<b>$1</b>')
+                    .replace(/\*(.*)\*/gim, '<i>$1</i>')
+                    .replace(/!\[(.*?)\]\((.*?)\)/gim, "<img alt='$1' src='$2' />")
+                    .replace(/\[(.*?)\]\((.*?)\)/gim, "<a href='$2' target='_blank' style='color:cyan'>$1</a>")
+                    .replace(/\n/gim, '<br />');
+            };
+
+            input.addEventListener('input', () => {
+                preview.innerHTML = parseMD(input.value);
+            });
+        }
+
+        function loadMusicPlayer(container, appId) {
+            container.innerHTML = `
+                <div class="media-container">
+                    <canvas id="viz-${appId}" class="music-visualizer"></canvas>
+                    <audio id="audio-${appId}" controls crossorigin="anonymous" style="width:100%; margin-top:auto;">
+                        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mp3">
+                    </audio>
+                </div>
+            `;
+
+            const audio = container.querySelector(`#audio-${appId}`);
+            const canvas = container.querySelector(`#viz-${appId}`);
+            const ctx = canvas.getContext('2d');
+
+            // Initialize Web Audio API on play
+            audio.onplay = () => {
+                if (!audioContexts[appId]) {
+                    const actx = new (window.AudioContext || window.webkitAudioContext)();
+                    audioContexts[appId] = actx;
+                    const src = actx.createMediaElementSource(audio);
+                    const analyser = actx.createAnalyser();
+                    
+                    src.connect(analyser);
+                    analyser.connect(actx.destination);
+                    analyser.fftSize = 256;
+
+                    const bufferLength = analyser.frequencyBinCount;
+                    const dataArray = new Uint8Array(bufferLength);
+
+                    const renderFrame = () => {
+                        if (!document.getElementById(`win-${appId}`)) return; // Stop if window closed
+                        requestAnimationFrame(renderFrame);
+                        analyser.getByteFrequencyData(dataArray);
+                        
+                        ctx.fillStyle = '#000';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        
+                        const barWidth = (canvas.width / bufferLength) * 2.5;
+                        let barHeight;
+                        let x = 0;
+
+                        for (let i = 0; i < bufferLength; i++) {
+                            barHeight = dataArray[i] / 2;
+                            ctx.fillStyle = `rgb(${barHeight + 100}, 50, 50)`;
+                            ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                            x += barWidth + 1;
+                        }
+                    };
+                    renderFrame();
+                }
+                if (audioContexts[appId].state === 'suspended') audioContexts[appId].resume();
+            };
+        }
+
+        // --- SETTINGS & GOOGLE DRIVE SYNC ---
+        
+        let CLIENT_ID; 
+        let API_KEY;
+        const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+        const BACKUP_FILENAME = 'd4rsh_os_data.json';
+
+        let tokenClient;
+        let gapiInited = false;
+        let gisInited = false;
+        let driveFileId = null;
+
+        // Callback for script load
+        window.gapiLoaded = () => gapi.load('client', () => { gapiInited = true; checkAuth(); });
+        window.gisLoaded = () => { gisInited = true; checkAuth(); };
+
+        // Fetch config from Vercel API
+        fetch('/api/env').then(res => res.json()).then(config => {
+            CLIENT_ID = config.CLIENT_ID;
+            API_KEY = config.API_KEY;
+            checkAuth();
+        }).catch(e => console.log('Running locally or config missing'));
+
+        function checkAuth() {
+            const btn = document.getElementById('auth-btn');
+            if(btn && gapiInited && gisInited && CLIENT_ID && API_KEY) btn.disabled = false;
+        }
+
+        function loadSettings(container) {
+            const configMsg = (CLIENT_ID && API_KEY) ? '' : '<p style="color:#ff5555; font-size:12px;">⚠️ Config loading or missing. Check Vercel Env Vars.</p>';
+            const currentTheme = localStorage.getItem('d4sh-theme') || 'dark';
+            const currentWallpaper = localStorage.getItem('d4sh-wallpaper') || '';
+            
+            container.innerHTML = `
+                <div class="settings-container">
+                    <h3>Personalization</h3>
+                    <div class="settings-group">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                            <span>Dark Mode</span>
+                            <input type="checkbox" ${currentTheme === 'dark' ? 'checked' : ''} onchange="applyTheme(this.checked ? 'dark' : 'light')">
+                        </div>
+                        <label>Wallpaper URL:</label>
+                        <div style="display:flex; gap:5px;">
+                            <input type="text" id="wallpaper-input" value="${currentWallpaper}" placeholder="https://example.com/image.jpg">
+                            <button class="app-btn" onclick="saveWallpaper(document.getElementById('wallpaper-input').value)">Set</button>
+                        </div>
+                        <button class="app-btn" style="margin-top:5px; background:#555;" onclick="resetWallpaper()">Reset Default</button>
+                    </div>
+
+                    <h3>Cloud Sync (Google Drive)</h3>
+                    <div class="settings-group">
+                        ${configMsg}
+                        <p style="font-size:14px; color:#ccc;">Sign in to sync data to <b>your personal Google Drive</b>.</p>
+                        <button class="app-btn" id="auth-btn" disabled onclick="handleAuth()">Sign In with Google</button>
+                        <p id="auth-status" style="font-size:12px; color:#aaa;">Waiting for scripts...</p>
+                    </div>
+                    <div class="settings-group">
+                        <button class="app-btn" id="sync-btn" disabled onclick="syncToDrive()">⬆ Sync Local to Cloud</button>
+                        <button class="app-btn" id="restore-btn" disabled onclick="restoreFromDrive()">⬇ Restore Cloud to Local</button>
+                    </div>
+                </div>
+            `;
+            checkAuth();
+        }
+
+        window.saveWallpaper = (url) => {
+            if (!url) return;
+            const bgStyle = url.startsWith('http') || url.startsWith('data') ? `url(${url}) no-repeat center center / cover` : url;
+            document.body.style.background = bgStyle;
+            localStorage.setItem('d4sh-wallpaper', url);
+        };
+
+        window.resetWallpaper = () => {
+             document.body.style.background = '';
+             localStorage.removeItem('d4sh-wallpaper');
+             document.getElementById('wallpaper-input').value = '';
+        };
+
+        async function handleAuth() {
+            if(!CLIENT_ID || !API_KEY) { alert('Configuration missing. Please check your Vercel Environment Variables.'); return; }
+
+            await gapi.client.init({ apiKey: API_KEY, discoveryDocs: [DISCOVERY_DOC] });
+            
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: async (resp) => {
+                    if (resp.error) throw resp;
+                    document.getElementById('auth-status').innerText = 'Signed In. Searching for backup...';
+                    await findBackup();
+                },
+            });
+
+            tokenClient.requestAccessToken({prompt: 'consent'});
+        }
+
+        async function findBackup() {
+            try {
+                const res = await gapi.client.drive.files.list({
+                    q: `name = '${BACKUP_FILENAME}' and trashed = false`,
+                    fields: 'files(id, name)',
+                });
+                const files = res.result.files;
+                if (files && files.length > 0) {
+                    driveFileId = files[0].id;
+                    document.getElementById('auth-status').innerText = 'Connected. Backup found.';
+                    document.getElementById('restore-btn').disabled = false;
+                } else {
+                    document.getElementById('auth-status').innerText = 'Connected. No backup found (will create new).';
+                }
+                document.getElementById('sync-btn').disabled = false;
+            } catch (err) {
+                document.getElementById('auth-status').innerText = 'Error: ' + err.message;
+            }
+        }
+
+        async function syncToDrive() {
+            const data = {};
+            for(let i=0; i<localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if(key.startsWith('d4sh-')) data[key] = localStorage.getItem(key);
+            }
+            
+            const file = new Blob([JSON.stringify(data)], {type: 'application/json'});
+            const metadata = { name: BACKUP_FILENAME, mimeType: 'application/json' };
+            const accessToken = gapi.client.getToken().access_token;
+            const form = new FormData();
+            
+            form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
+            form.append('file', file);
+
+            const url = driveFileId 
+                ? `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=multipart`
+                : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+            
+            const method = driveFileId ? 'PATCH' : 'POST';
+
+            fetch(url, { method, headers: { 'Authorization': 'Bearer ' + accessToken }, body: form })
+                .then(res => res.json())
+                .then(val => {
+                    if(val.id) driveFileId = val.id;
+                    alert('Sync Successful!');
+                });
+        }
+
+        async function restoreFromDrive() {
+            const res = await gapi.client.drive.files.get({ fileId: driveFileId, alt: 'media' });
+            const data = res.result; // gapi auto-parses JSON
+            Object.keys(data).forEach(k => localStorage.setItem(k, data[k]));
+            alert('Restored! Reloading...');
+            location.reload();
+        }
+
+        // --- GAMES ---
+
+        function loadSnake(container, appId) {
+            container.innerHTML = '<div class="game-container"><canvas id="snake-canvas" width="300" height="300"></canvas><p style="text-align:center">Arrows to move</p></div>';
+            const canvas = container.querySelector('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            let snake = [{x: 10, y: 10}];
+            let food = {x: 15, y: 15};
+            let dx = 0, dy = 0;
+            let gridSize = 15;
+            let tileCount = 20;
+
+            function gameLoop() {
+                snake[0].x += dx;
+                snake[0].y += dy;
+
+                // Wall collision
+                if (snake[0].x < 0) snake[0].x = tileCount - 1;
+                if (snake[0].x >= tileCount) snake[0].x = 0;
+                if (snake[0].y < 0) snake[0].y = tileCount - 1;
+                if (snake[0].y >= tileCount) snake[0].y = 0;
+
+                // Background
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Food
+                ctx.fillStyle = 'red';
+                ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 2, gridSize - 2);
+
+                // Snake
+                ctx.fillStyle = 'lime';
+                for (let i = 0; i < snake.length; i++) {
+                    ctx.fillRect(snake[i].x * gridSize, snake[i].y * gridSize, gridSize - 2, gridSize - 2);
+                    if (i > 0 && snake[i].x === snake[0].x && snake[i].y === snake[0].y) {
+                        // Tail collision reset
+                        snake = [{x: 10, y: 10}];
+                        dx = 0; dy = 0;
+                    }
+                }
+
+                // Move body
+                for (let i = snake.length - 1; i > 0; i--) {
+                    snake[i] = {...snake[i-1]};
+                }
+
+                // Eat food
+                if (snake[0].x === food.x && snake[0].y === food.y) {
+                    snake.push({});
+                    food = {
+                        x: Math.floor(Math.random() * tileCount),
+                        y: Math.floor(Math.random() * tileCount)
+                    };
+                }
+            }
+
+            document.addEventListener('keydown', e => {
+                // Only control if window is focused (simple check: is it the top z-index?)
+                // For simplicity in this demo, we just check if the key is pressed.
+                // In a real OS, we'd check document.activeElement or similar.
+                if(container.closest('.window').style.zIndex != zIndexCounter) return;
+
+                switch(e.key) {
+                    case 'ArrowLeft': if(dx!==1) { dx=-1; dy=0; } break;
+                    case 'ArrowRight': if(dx!==-1) { dx=1; dy=0; } break;
+                    case 'ArrowUp': if(dy!==1) { dx=0; dy=-1; } break;
+                    case 'ArrowDown': if(dy!==-1) { dx=0; dy=1; } break;
+                }
+            });
+
+            gameIntervals[appId] = setInterval(gameLoop, 100);
+        }
+
+        function loadDino(container, appId) {
+            container.innerHTML = '<div class="game-container"><canvas id="dino-canvas" width="300" height="150"></canvas><p style="text-align:center">Space to Jump</p></div>';
+            const canvas = container.querySelector('canvas');
+            const ctx = canvas.getContext('2d');
+
+            let dino = { x: 20, y: 120, w: 20, h: 20, dy: 0, jump: false };
+            let obstacles = [];
+            let frame = 0;
+            let score = 0;
+            let gameOver = false;
+
+            function reset() {
+                dino.y = 120; dino.dy = 0; obstacles = []; frame = 0; score = 0; gameOver = false;
+            }
+
+            function loop() {
+                if (gameOver) {
+                    ctx.fillStyle = 'white';
+                    ctx.fillText("Game Over. Space to restart", 80, 75);
+                    return;
+                }
+
+                ctx.fillStyle = '#222';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Ground
+                ctx.strokeStyle = 'white';
+                ctx.beginPath(); ctx.moveTo(0, 140); ctx.lineTo(300, 140); ctx.stroke();
+
+                // Dino Physics
+                if (dino.jump) {
+                    dino.dy = -5;
+                    dino.jump = false;
+                }
+                dino.y += dino.dy;
+                dino.dy += 0.3; // Gravity
+                if (dino.y > 120) { dino.y = 120; dino.dy = 0; }
+
+                // Draw Dino
+                ctx.fillStyle = 'white';
+                ctx.fillRect(dino.x, dino.y, dino.w, dino.h);
+
+                // Obstacles
+                if (frame % 100 === 0) {
+                    obstacles.push({ x: 300, w: 15, h: 20 });
+                }
+
+                obstacles.forEach((obs, i) => {
+                    obs.x -= 3;
+                    ctx.fillStyle = 'red';
+                    ctx.fillRect(obs.x, 120, obs.w, obs.h);
+
+                    // Collision
+                    if (dino.x < obs.x + obs.w && dino.x + dino.w > obs.x &&
+                        dino.y < 120 + obs.h && dino.y + dino.h > 120) {
+                        gameOver = true;
+                    }
+
+                    if (obs.x + obs.w < 0) obstacles.splice(i, 1);
+                });
+
+                ctx.fillStyle = 'white';
+                ctx.fillText(`Score: ${frame}`, 240, 20);
+                frame++;
+            }
+
+            document.addEventListener('keydown', e => {
+                if(container.closest('.window').style.zIndex != zIndexCounter) return;
+                if (e.code === 'Space') {
+                    if (gameOver) reset();
+                    else if (dino.y === 120) dino.jump = true;
+                }
+            });
+
+            gameIntervals[appId] = setInterval(loop, 20);
+        }
+
+        function loadFlappy(container, appId) {
+            container.innerHTML = '<div class="game-container"><canvas id="flappy-canvas" width="300" height="400"></canvas><p style="text-align:center">Space to Flap</p></div>';
+            const canvas = container.querySelector('canvas');
+            const ctx = canvas.getContext('2d');
+
+            let bird = { x: 50, y: 150, dy: 0, r: 10 };
+            let pipes = [];
+            let frame = 0;
+            let gameOver = false;
+
+            function reset() {
+                bird.y = 150; bird.dy = 0; pipes = []; frame = 0; gameOver = false;
+            }
+
+            function loop() {
+                if (gameOver) {
+                    ctx.fillStyle = 'white';
+                    ctx.fillText("Game Over. Space to restart", 80, 200);
+                    return;
+                }
+
+                ctx.fillStyle = '#333';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Bird
+                bird.dy += 0.2;
+                bird.y += bird.dy;
+                ctx.fillStyle = 'yellow';
+                ctx.beginPath();
+                ctx.arc(bird.x, bird.y, bird.r, 0, Math.PI*2);
+                ctx.fill();
+
+                // Pipes
+                if (frame % 120 === 0) {
+                    let gap = 100;
+                    let topH = Math.random() * (canvas.height - gap - 50) + 20;
+                    pipes.push({ x: 300, top: topH, gap: gap });
+                }
+
+                pipes.forEach((p, i) => {
+                    p.x -= 2;
+                    ctx.fillStyle = 'green';
+                    // Top pipe
+                    ctx.fillRect(p.x, 0, 40, p.top);
+                    // Bottom pipe
+                    ctx.fillRect(p.x, p.top + p.gap, 40, canvas.height - (p.top + p.gap));
+
+                    // Collision
+                    if (bird.x + bird.r > p.x && bird.x - bird.r < p.x + 40) {
+                        if (bird.y - bird.r < p.top || bird.y + bird.r > p.top + p.gap) {
+                            gameOver = true;
+                        }
+                    }
+                    if (p.x + 40 < 0) pipes.splice(i, 1);
+                });
+
+                // Floor/Ceiling collision
+                if (bird.y + bird.r > canvas.height || bird.y - bird.r < 0) gameOver = true;
+
+                frame++;
+            }
+
+            document.addEventListener('keydown', e => {
+                if(container.closest('.window').style.zIndex != zIndexCounter) return;
+                if (e.code === 'Space') {
+                    if (gameOver) reset();
+                    else bird.dy = -4;
+                }
+            });
+
+            gameIntervals[appId] = setInterval(loop, 20);
+        }
+
+        // Start
+        init();
+    </script>
+</body>
+</html>
