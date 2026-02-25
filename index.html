@@ -6,12 +6,12 @@
     <title>D4rsh OS</title>
     <style>
         :root {
-            --bg-color: #1a1a2e;
-            --taskbar-color: #16213e;
-            --window-bg: #0f3460;
-            --text-color: #e94560;
+            --bg-color: #f1f3f4;
+            --taskbar-color: rgba(32, 33, 36, 0.9);
+            --window-bg: #ffffff;
+            --text-color: #202124;
             --white: #ffffff;
-            --glass: rgba(22, 33, 62, 0.9);
+            --glass: rgba(255, 255, 255, 0.9);
         }
 
         * { box-sizing: border-box; user-select: none; }
@@ -20,11 +20,13 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            font-family: 'Roboto', 'Segoe UI', sans-serif;
+            background: url('https://images.unsplash.com/photo-1579546929518-9e396f3cc809?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80') no-repeat center center fixed;
+            background-size: cover;
             height: 100vh;
             width: 100vw;
-            color: var(--white);
+            color: #202124;
+            -webkit-font-smoothing: antialiased;
         }
 
         /* Desktop Area */
@@ -51,25 +53,27 @@
             float: left;
             text-align: center;
             font-size: 12px;
-            text-shadow: 1px 1px 2px black;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
         }
 
-        .desktop-icon:hover { background: rgba(255,255,255,0.1); }
+        .desktop-icon:hover { background: rgba(255,255,255,0.2); border-radius: 12px; }
         .desktop-icon span { font-size: 24px; margin-bottom: 5px; }
 
         /* Window Styles */
         .window {
             position: absolute;
             background: var(--window-bg);
-            border: 1px solid #333;
-            border-radius: 8px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 12px 48px rgba(0,0,0,0.15);
             display: flex;
             flex-direction: column;
             min-width: 300px;
             min-height: 200px;
             resize: both; /* Native CSS Resizing */
             overflow: hidden;
+            padding: 0;
         }
 
         .window.maximized {
@@ -79,16 +83,20 @@
             height: 100% !important;
             resize: none;
             border-radius: 0;
+            padding: 0;
         }
 
         .title-bar {
-            height: 30px;
-            background: rgba(0,0,0,0.2);
+            height: 36px;
+            background: #f1f3f4;
+            border-bottom: 1px solid #dadce0;
             display: flex;
             align-items: center;
             justify-content: space-between;
             padding: 0 10px;
             cursor: grab;
+            color: #5f6368;
+            font-size: 13px;
         }
 
         .title-bar:active { cursor: grabbing; }
@@ -96,104 +104,165 @@
         .window-controls button {
             background: none;
             border: none;
-            color: var(--white);
+            color: #5f6368;
             cursor: pointer;
             font-weight: bold;
             margin-left: 5px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
         }
         
-        .window-controls button:hover { color: var(--text-color); }
+        .window-controls button:hover { background: rgba(0,0,0,0.1); }
+        .window-controls button:last-child:hover { background: #e81123; color: white; }
 
         .window-content {
             flex: 1;
             padding: 10px;
             overflow: auto;
-            background: rgba(255,255,255,0.05);
+            background: #fff;
+            color: #202124;
             position: relative;
             cursor: auto;
         }
 
         /* Taskbar */
         #taskbar {
-            height: 40px;
+            height: 48px;
             background: var(--taskbar-color);
+            backdrop-filter: blur(10px);
             display: flex;
             align-items: center;
-            padding: 0 10px;
-            border-top: 1px solid #333;
+            padding: 0 12px;
+            border-top: none;
+            box-shadow: 0 -1px 4px rgba(0,0,0,0.1);
             z-index: 9999;
             position: absolute;
             bottom: 0;
             width: 100%;
+            justify-content: space-between;
         }
 
         #start-btn {
-            background: var(--text-color);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
             border: none;
-            color: white;
-            padding: 5px 15px;
-            border-radius: 4px;
-            font-weight: bold;
+            background: rgba(255,255,255,0.1);
+            box-shadow: none;
             margin-right: 10px;
             cursor: pointer;
+            font-size: 0;
+            position: relative;
+            overflow: hidden;
+            transition: background 0.2s;
+        }
+        #start-btn::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: white;
+            box-shadow: 0 0 0 2px rgba(255,255,255,0.3);
+        }
+        #start-btn:hover { background: rgba(255,255,255,0.2); }
+
+        #taskbar-apps {
+            flex: 1;
+            justify-content: center;
+        }
+        
+        #clock {
+            background: rgba(255,255,255,0.1);
+            padding: 6px 12px;
+            border-radius: 18px;
+            color: #e8eaed;
+            font-weight: 500;
         }
 
         .taskbar-item {
-            padding: 5px 10px;
-            margin-right: 5px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 4px;
+            padding: 0 12px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            margin: 0 4px;
+            background: transparent;
+            border: none;
+            border-radius: 18px;
+            box-shadow: none;
             cursor: pointer;
             font-size: 12px;
+            min-width: auto;
+            color: #e8eaed;
+            text-shadow: none;
+            transition: background 0.2s, box-shadow 0.2s;
         }
-
-        .taskbar-item.active { background: rgba(255,255,255,0.2); border-bottom: 2px solid var(--text-color); }
+        .taskbar-item:hover { 
+            background: rgba(255,255,255,0.1); 
+            box-shadow: none; }
+        .taskbar-item.active { 
+            background: rgba(255,255,255,0.15);
+            border: none;
+            box-shadow: none;
+        }
 
         /* App Specific Styles */
         input, textarea {
             width: 100%;
-            background: rgba(0,0,0,0.3);
-            border: 1px solid #444;
-            color: white;
+            background: #fff;
+            color: #000;
+            border: 1px solid #ccc;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
             padding: 5px;
             margin-bottom: 5px;
         }
 
         button.app-btn {
-            background: var(--text-color);
+            background: #1a73e8;
             color: white;
             border: none;
-            padding: 5px 10px;
+            padding: 6px 12px;
             cursor: pointer;
             margin-top: 5px;
+            border-radius: 4px;
+            font-weight: 500;
         }
+        button.app-btn:hover { background: #1765cc; }
 
         ul { list-style: none; padding: 0; }
-        #todo-list li { background: rgba(0,0,0,0.2); padding: 5px; margin-bottom: 2px; display: flex; justify-content: space-between; }
+        #todo-list li { background: #fff; border: 1px solid #ddd; color: #000; padding: 5px; margin-bottom: 2px; display: flex; justify-content: space-between; }
         
         /* File Explorer */
         .file-explorer-container { display: flex; height: 100%; gap: 10px; }
-        .file-list-panel { width: 150px; border-right: 1px solid #444; padding-right: 10px; display: flex; flex-direction: column; }
+        .file-list-panel { width: 150px; border-right: 1px solid #ccc; padding-right: 10px; display: flex; flex-direction: column; }
         .file-list-panel ul { flex: 1; overflow-y: auto; }
-        .file-list-panel li { cursor: pointer; padding: 5px; border-radius: 3px; margin-bottom: 2px; }
-        .file-list-panel li:hover { background: rgba(255,255,255,0.1); }
+        .file-list-panel li { cursor: pointer; padding: 5px; border-radius: 3px; margin-bottom: 2px; color: #000; }
+        .file-list-panel li:hover { background: #e0e0e0; border: 1px solid #ccc; }
         .file-preview-panel { flex: 1; display: flex; flex-direction: column; }
-        .file-preview-panel textarea { flex: 1; resize: none; background: rgba(0,0,0,0.1); user-select: text; }
+        .file-preview-panel textarea { flex: 1; resize: none; background: #fff; color: #000; user-select: text; }
+        #preview-content { color: #333 !important; }
 
         /* Calculator */
         .calculator-container { height: 100%; display: flex; flex-direction: column; }
         #calc-display { text-align: right; font-size: 1.5em; padding: 10px; margin-bottom: 10px; }
         .calculator-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; flex: 1; }
-        .calc-btn { background: #333; border: none; color: white; font-size: 1.2em; cursor: pointer; border-radius: 4px; }
-        .calc-btn:hover { background: #444; }
-        .calc-btn.op { background: #555; }
-        .calc-btn.clear { background: var(--text-color); }
+        .calc-btn { background: linear-gradient(to bottom, #f9f9f9 0%, #e0e0e0 100%); border: 1px solid #999; color: black; font-size: 1.2em; cursor: pointer; border-radius: 4px; }
+        .calc-btn:hover { background: linear-gradient(to bottom, #fff 0%, #f0f0f0 100%); border-color: #3c7fb1; box-shadow: 0 0 2px rgba(60,127,177,0.5); }
+        .calc-btn.op { background: linear-gradient(to bottom, #e6e6e6 0%, #d0d0d0 100%); }
+        .calc-btn.clear { background: #ffcccc; }
         .calc-btn.equals { background: #1f8ad6; grid-column: 4; grid-row: 4 / span 2; }
         .calc-btn.plus { grid-row: 2 / span 2; }
         .calc-btn.zero { grid-column: 1 / span 2; }
 
         /* Paint App */
-        .paint-toolbar { display: flex; align-items: center; gap: 10px; padding-bottom: 5px; border-bottom: 1px solid #444; margin-bottom: 5px; }
+        .paint-toolbar { display: flex; align-items: center; gap: 10px; padding-bottom: 5px; border-bottom: 1px solid #ccc; margin-bottom: 5px; }
         .paint-toolbar input[type="color"] { width: 30px; height: 30px; padding: 0; border: none; background: none; }
         .paint-palette { display: flex; gap: 2px; }
         .paint-color-swatch { width: 20px; height: 20px; border: 1px solid #555; cursor: pointer; }
@@ -205,8 +274,8 @@
 
         /* Markdown Editor */
         .markdown-container { display: flex; height: 100%; gap: 10px; }
-        .markdown-container textarea { flex: 1; resize: none; background: rgba(0,0,0,0.3); color: white; border: 1px solid #444; padding: 10px; font-family: monospace; }
-        .markdown-container #md-preview { flex: 1; overflow-y: auto; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid #444; word-wrap: break-word; }
+        .markdown-container textarea { flex: 1; resize: none; background: #fff; color: #000; border: 1px solid #ccc; padding: 10px; font-family: monospace; }
+        .markdown-container #md-preview { flex: 1; overflow-y: auto; padding: 10px; background: #fff; color: #000; border: 1px solid #ccc; word-wrap: break-word; }
         .markdown-container #md-preview img { max-width: 100%; }
 
         /* Music Player */
@@ -215,7 +284,7 @@
         /* Clock App */
         .clock-container { text-align: center; display: flex; flex-direction: column; height: 100%; justify-content: center; }
         .clock-time { font-size: 2.5em; margin-bottom: 10px; font-family: monospace; }
-        .clock-tabs { display: flex; justify-content: center; gap: 5px; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        .clock-tabs { display: flex; justify-content: center; gap: 5px; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
 
         /* PDF Viewer */
         .pdf-container { display: flex; flex-direction: column; height: 100%; }
@@ -252,6 +321,7 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             transition: transform 0.2s;
             user-select: none;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
         #weather-widget:hover { transform: scale(1.02); background: rgba(22, 33, 62, 0.8); }
         .weather-main { display: flex; align-items: center; justify-content: space-between; }
@@ -263,12 +333,12 @@
 
         /* Calendar App */
         .calendar-container { height: 100%; display: flex; flex-direction: column; }
-        .calendar-header { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(0,0,0,0.2); }
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #e0e0e0; border-bottom: 1px solid #ccc; }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; flex: 1; text-align: center; align-content: start; }
-        .calendar-day-name { font-weight: bold; padding: 5px; background: rgba(255,255,255,0.05); font-size: 0.9em; }
-        .calendar-date { padding: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 4px; }
-        .calendar-date:hover { background: rgba(255,255,255,0.1); }
-        .calendar-date.today { background: var(--text-color); color: white; font-weight: bold; }
+        .calendar-day-name { font-weight: bold; padding: 5px; background: #f0f0f0; font-size: 0.9em; color: #333; }
+        .calendar-date { padding: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 4px; color: #000; }
+        .calendar-date:hover { background: #d0e0f0; border: 1px solid #a0c0e0; }
+        .calendar-date.today { background: #e0f0ff; border: 1px solid #80b0e0; font-weight: bold; }
         .calendar-date.empty { background: transparent; cursor: default; }
 
         /* Matrix Text Effect */
@@ -290,29 +360,34 @@
         /* Start Menu */
         #start-menu {
             position: absolute;
-            bottom: 40px;
-            left: 0;
-            width: 250px;
-            background: rgba(22, 33, 62, 0.95);
-            border: 1px solid #333;
-            border-bottom: none;
-            border-top-right-radius: 8px;
+            bottom: 60px;
+            left: 20px;
+            width: 320px;
+            background: rgba(32, 33, 36, 0.95);
+            backdrop-filter: blur(20px);
+            border: none;
+            border-radius: 16px;
             display: none;
             flex-direction: column;
             z-index: 10000;
-            padding: 10px;
-            box-shadow: 5px -5px 15px rgba(0,0,0,0.5);
+            padding: 16px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.3);
         }
 
         .start-menu-item {
-            padding: 10px;
+            padding: 12px;
             cursor: pointer;
-            color: white;
+            color: #e8eaed;
             display: flex;
             align-items: center;
-            border-radius: 4px;
+            border-radius: 24px;
+            border: 1px solid transparent;
         }
-        .start-menu-item:hover { background: rgba(255,255,255,0.1); }
+        .start-menu-item:hover { 
+            background: rgba(255,255,255,0.1);
+            border-color: transparent;
+            box-shadow: none;
+        }
         .start-menu-item span { margin-right: 10px; font-size: 18px; }
 
         /* Content Resizing Helpers */
@@ -323,7 +398,7 @@
 
         /* Settings App */
         .settings-container { padding: 20px; display: flex; flex-direction: column; gap: 10px; }
-        .settings-group { background: rgba(0,0,0,0.2); padding: 15px; border-radius: 5px; }
+        .settings-group { background: #fff; border: 1px solid #dadce0; padding: 15px; border-radius: 8px; color: #202124; }
     </style>
     <!-- Google API Scripts -->
     <script src="https://apis.google.com/js/api.js" async defer onload="gapiLoaded()"></script>
@@ -340,7 +415,7 @@
     </div>
 
     <div id="taskbar">
-        <button id="start-btn" onclick="toggleStartMenu()">D4rsh</button>
+        <button id="start-btn" onclick="toggleStartMenu()" title="Launcher"></button>
         <div id="taskbar-apps" style="display:flex;"></div>
         <div style="margin-left: auto; font-size: 12px;" id="clock">00:00</div>
     </div>
@@ -428,18 +503,18 @@
             const root = document.documentElement;
             if (theme === 'light') {
                 root.style.setProperty('--bg-color', '#f0f2f5');
-                root.style.setProperty('--taskbar-color', '#e4e6eb');
+                root.style.setProperty('--taskbar-color', 'rgba(255, 255, 255, 0.9)');
                 root.style.setProperty('--window-bg', '#ffffff');
                 root.style.setProperty('--text-color', '#007bff');
                 root.style.setProperty('--white', '#1c1e21');
                 root.style.setProperty('--glass', 'rgba(255, 255, 255, 0.9)');
             } else {
-                root.style.setProperty('--bg-color', '#1a1a2e');
-                root.style.setProperty('--taskbar-color', '#16213e');
-                root.style.setProperty('--window-bg', '#0f3460');
-                root.style.setProperty('--text-color', '#e94560');
+                root.style.setProperty('--bg-color', '#f1f3f4');
+                root.style.setProperty('--taskbar-color', 'rgba(32, 33, 36, 0.9)');
+                root.style.setProperty('--window-bg', '#ffffff');
+                root.style.setProperty('--text-color', '#202124');
                 root.style.setProperty('--white', '#ffffff');
-                root.style.setProperty('--glass', 'rgba(22, 33, 62, 0.9)');
+                root.style.setProperty('--glass', 'rgba(255, 255, 255, 0.9)');
             }
             localStorage.setItem('d4sh-theme', theme);
         }
@@ -1161,7 +1236,7 @@
             }
             container.innerHTML = `
                 <div style="display:flex; flex-direction:column; height:100%;">
-                    <div style="padding-bottom:5px; margin-bottom:5px; border-bottom:1px solid #444; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="padding-bottom:5px; margin-bottom:5px; border-bottom:1px solid #ccc; display:flex; justify-content:space-between; align-items:center;">
                         <h3 style="margin:0;">${data.filename}</h3>
                         <button class="app-btn" id="notes-save-btn">Save</button>
                     </div>
@@ -1529,7 +1604,7 @@
         function loadPDFViewer(container, data = null) {
             container.innerHTML = `
                 <div class="pdf-container">
-                    <div style="padding: 5px; background: rgba(0,0,0,0.2); border-bottom: 1px solid #444;">
+                    <div style="padding: 5px; background: #e0e0e0; border-bottom: 1px solid #ccc;">
                         <input type="file" id="pdf-upload" accept="application/pdf" style="width: auto;">
                     </div>
                 </div>
