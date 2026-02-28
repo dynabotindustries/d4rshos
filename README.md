@@ -25,7 +25,10 @@ A web-based desktop environment (Web OS) built with vanilla HTML, CSS, and JavaS
     *   Music Player (With visualizer)
     *   Paint (Canvas drawing)
 *   **Games**: Snake, Chrome Dino Clone, Flappy Bird Clone.
-*   **Cloud Sync**: Google Drive integration to backup/restore OS data.
+*   **Cloud Sync**:
+*   * Sign into your google account from the settings app
+    * Click on sync data to cloud button if you want your session to be backed up
+    * In a new session (or a new device), simply sign in and click the restore from cloud button
 *   **Customization**: Dark/Light mode and custom wallpaper support.
 
 ## How to Run
