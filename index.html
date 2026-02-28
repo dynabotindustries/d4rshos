@@ -792,12 +792,18 @@
 
             document.getElementById('desktop').appendChild(win);
             addToTaskbar(app);
-            loadAppContent(app, `content-${app.id}`, data);
+            loadAppContent(app, `content-${app.id}`, data, win);
         }
 
         function closeWindow(id) {
             const win = document.getElementById(id);
             if (win) {
+                // Generic cleanup for app activities
+                if (win.stopAppActivity) {
+                    win.stopAppActivity();
+                    delete win.stopAppActivity;
+                }
+
                 // Stop game loops if applicable
                 const appId = id.replace('win-', '');
                 if (gameIntervals[appId]) clearInterval(gameIntervals[appId]);
@@ -832,6 +838,13 @@
         }
 
         function focusWindow(win) {
+            // Stop activities (like cmatrix) in any other windows that lose focus
+            document.querySelectorAll('.window').forEach(otherWin => {
+                if (otherWin.id !== win.id && otherWin.stopAppActivity) {
+                    otherWin.stopAppActivity();
+                }
+            });
+
             win.style.zIndex = ++zIndexCounter;
             // Highlight taskbar
             document.querySelectorAll('.taskbar-item').forEach(el => el.classList.remove('active'));
@@ -842,6 +855,9 @@
 
         function minimizeWindow(id) {
             const win = document.getElementById(id);
+            if (win && win.stopAppActivity) {
+                win.stopAppActivity();
+            }
             win.style.display = 'none';
             document.getElementById(`task-${id.replace('win-', '')}`).classList.remove('active');
         }
@@ -908,7 +924,7 @@
         const appTimers = {};
 
 
-        function loadAppContent(app, containerId, data = null) {
+        function loadAppContent(app, containerId, data = null, win = null) {
             const container = document.getElementById(containerId);            
             
             if (app.id === 'todo') loadTodo(container);
@@ -917,7 +933,7 @@
             else if (app.id === 'files') loadFileExplorer(container);
             else if (app.id === 'browser') loadBrowser(container);
             else if (app.id === 'maps') loadMaps(container);
-            else if (app.id === 'terminal') loadTerminal(container);
+            else if (app.id === 'terminal') loadTerminal(container, app.id, win);
             else if (app.id === 'calculator') loadCalculator(container);
             else if (app.id === 'settings') loadSettings(container);
             else if (app.id === 'notes') loadNotes(container, data);
@@ -1231,8 +1247,6 @@
                         <button class="app-btn" id="browser-go">Go</button>
                     </div>
                     <div class="browser-bookmarks">
-                        <button class="app-btn" id="bm-ddg">DuckDuckGo</button>
-                        <button class="app-btn" id="bm-yt">YouTube</button>
                         <button class="app-btn" id="bm-wiki">Wikipedia</button>
                     </div>
                     <iframe id="browser-frame" class="browser-frame" src="https://www.wikipedia.org"></iframe>
@@ -1252,8 +1266,6 @@
             container.querySelector('#browser-refresh').onclick = () => { try { frame.contentWindow.location.reload(); } catch(e) { frame.src = frame.src; } };
             container.querySelector('#browser-back').onclick = () => { try { frame.contentWindow.history.back(); } catch(e) { console.log('Cross-origin history blocked'); } };
             
-            container.querySelector('#bm-ddg').onclick = () => navigateTo('https://duckduckgo.com');
-            container.querySelector('#bm-yt').onclick = () => navigateTo('https://www.youtube.com/embed?listType=search&list=trending');
             container.querySelector('#bm-wiki').onclick = () => navigateTo('https://www.wikipedia.org');
 
             urlInput.addEventListener('keypress', (e) => {
@@ -1269,7 +1281,7 @@
             `;
         }
 
-        function loadTerminal(container) {
+        function loadTerminal(container, appId, win) {
             // Remove default padding
             container.style.padding = '0';
             container.innerHTML = `
@@ -1283,20 +1295,97 @@
             `;
             const output = container.querySelector('#term-output');
             const input = container.querySelector('#term-input');
+            const termContainer = container.querySelector('.terminal-container');
+            const inputLine = container.querySelector('.terminal-input-line');
+            let matrixInterval = null;
+
+            if (!appTimers[appId]) appTimers[appId] = [];
+
+            // Generic cleanup function attached to the window element
+            if (win) {
+                win.stopAppActivity = () => {
+                    stopCMatrix();
+                };
+            }
+
+            const stopCMatrix = () => {
+                if (matrixInterval) {
+                    clearInterval(matrixInterval);
+                    const index = appTimers[appId].indexOf(matrixInterval);
+                    if (index > -1) appTimers[appId].splice(index, 1);
+                    matrixInterval = null;
+
+                    const canvas = termContainer.querySelector('#matrix-canvas');
+                    if (canvas) canvas.remove();
+                    
+                    output.style.display = 'block';
+                    inputLine.style.display = 'flex';
+                    document.removeEventListener('keydown', stopCMatrixOnKey);
+                    input.focus();
+                }
+            };
+
+            const stopCMatrixOnKey = (e) => {
+                stopCMatrix();
+            };
+
+            const runCMatrix = () => {
+                output.style.display = 'none';
+                inputLine.style.display = 'none';
+
+                const canvas = document.createElement('canvas');
+                canvas.id = 'matrix-canvas';
+                canvas.style.width = '100%';
+                canvas.style.height = '100%';
+                termContainer.prepend(canvas);
+
+                const ctx = canvas.getContext('2d');
+                canvas.width = termContainer.clientWidth;
+                canvas.height = termContainer.clientHeight;
+
+                const letters = '日ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘｱﾎﾃﾏｹﾒｴｶｷﾑﾕﾗｾﾈｽﾀﾇﾍ0123456789';
+                const fontSize = 16;
+                const columns = canvas.width / fontSize;
+                const drops = [];
+                for (let x = 0; x < columns; x++) drops[x] = 1;
+
+                matrixInterval = setInterval(() => {
+                    ctx.fillStyle = 'rgba(30, 30, 30, 0.05)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    ctx.fillStyle = '#0f0';
+                    ctx.font = fontSize + 'px monospace';
+
+                    for (let i = 0; i < drops.length; i++) {
+                        const text = letters.charAt(Math.floor(Math.random() * letters.length));
+                        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+                        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                            drops[i] = 0;
+                        }
+                        drops[i]++;
+                    }
+                }, 33);
+                appTimers[appId].push(matrixInterval);
+                document.addEventListener('keydown', stopCMatrixOnKey, { once: true });
+            };
 
             input.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
                     const cmdLine = input.value;
                     const args = cmdLine.trim().split(' ');
                     const command = args[0].toLowerCase();
-                    
                     output.innerHTML += `<div><span class="terminal-prompt">root@d4rsh:~$</span> ${cmdLine}</div>`;
-                    
                     let response = '';
                     switch(command) {
                         case 'help':
-                            response = "Commands: help, clear, echo, date, whoami, sudo, rm, exit, reboot";
+                            response = "Commands: help, clear, echo, date, whoami, sudo, rm, exit, reboot, cmatrix";
                             break;
+                        case 'cmatrix':
+                            runCMatrix();
+                            input.value = '';
+                            output.scrollTop = output.scrollHeight;
+                            return;
                         case 'clear':
                             output.innerHTML = '';
                             input.value = '';
@@ -1332,13 +1421,11 @@
                         default:
                             response = `Command '${command}' not found. Did you mean 'give_up'?`;
                     }
-                    
                     if(response) output.innerHTML += `<div style="color:#ccc">${response}</div>`;
                     input.value = '';
                     output.scrollTop = output.scrollHeight;
                 }
             });
-            
             // Auto focus
             setTimeout(() => input.focus(), 10);
         }
