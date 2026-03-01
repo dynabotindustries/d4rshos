@@ -938,7 +938,7 @@
             else if (app.id === 'settings') loadSettings(container);
             else if (app.id === 'notes') loadNotes(container, data);
             else if (app.id === 'imageviewer') loadImageViewer(container, data);
-            else if (app.id === 'paint') loadPaint(container);
+            else if (app.id === 'paint') loadPaint(container, win);
             else if (app.id === 'sysinfo') loadSysInfo(container);
             else if (app.id === 'camera') loadCamera(container, app.id);
             else if (app.id === 'video') loadVideoPlayer(container, data);
@@ -1482,7 +1482,7 @@
             });
         }
 
-        function loadPaint(container) {
+        function loadPaint(container, win) {
             container.innerHTML = `
                 <div style="display:flex; flex-direction:column; height:100%;">
                     <div class="paint-toolbar">
@@ -1539,6 +1539,19 @@
             });
 
             // Set canvas resolution to match display size
+            const updateCanvasSize = () => {
+                const rect = canvas.getBoundingClientRect();
+                if (canvas.width !== rect.width || canvas.height !== rect.height) {
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    canvas.width = rect.width;
+                    canvas.height = rect.height;
+                    ctx.putImageData(imageData, 0, 0);
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                }
+            };
+
+            // Set canvas resolution to match display size
             setTimeout(() => {
                 canvas.width = canvas.clientWidth;
                 canvas.height = canvas.clientHeight;
@@ -1546,14 +1559,27 @@
                 ctx.lineJoin = 'round';
             }, 0);
 
+            // Resize Observer
+            const resizeObserver = new ResizeObserver(() => updateCanvasSize());
+            resizeObserver.observe(container);
+
             let isDrawing = false;
             let startX = 0; let startY = 0;
             let snapshot;
 
+            const getPos = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                return {
+                    x: (e.clientX - rect.left) * (canvas.width / rect.width),
+                    y: (e.clientY - rect.top) * (canvas.height / rect.height)
+                };
+            };
+
             const start = (e) => {
                 isDrawing = true;
-                startX = e.offsetX;
-                startY = e.offsetY;
+                const pos = getPos(e);
+                startX = pos.x;
+                startY = pos.y;
                 ctx.beginPath();
                 ctx.lineWidth = sizePicker.value;
                 ctx.strokeStyle = currentTool === 'eraser' ? '#ffffff' : colorPicker.value;
@@ -1566,21 +1592,22 @@
             };
             const draw = (e) => {
                 if (!isDrawing) return;
+                const pos = getPos(e);
                 
                 if (currentTool === 'brush' || currentTool === 'eraser') {
-                    ctx.lineTo(e.offsetX, e.offsetY);
+                    ctx.lineTo(pos.x, pos.y);
                     ctx.stroke();
                     ctx.beginPath();
-                    ctx.moveTo(e.offsetX, e.offsetY);
+                    ctx.moveTo(pos.x, pos.y);
                 } else if (currentTool === 'rect') {
                     ctx.putImageData(snapshot, 0, 0);
                     ctx.beginPath();
-                    ctx.rect(startX, startY, e.offsetX - startX, e.offsetY - startY);
+                    ctx.rect(startX, startY, pos.x - startX, pos.y - startY);
                     ctx.stroke();
                 } else if (currentTool === 'circle') {
                     ctx.putImageData(snapshot, 0, 0);
                     ctx.beginPath();
-                    const radius = Math.sqrt(Math.pow(e.offsetX - startX, 2) + Math.pow(e.offsetY - startY, 2));
+                    const radius = Math.sqrt(Math.pow(pos.x - startX, 2) + Math.pow(pos.y - startY, 2));
                     ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
                     ctx.stroke();
                 }
@@ -1589,8 +1616,14 @@
 
             canvas.addEventListener('mousedown', start);
             canvas.addEventListener('mousemove', draw);
-            canvas.addEventListener('mouseup', stop);
-            canvas.addEventListener('mouseout', stop);
+            window.addEventListener('mouseup', stop);
+
+            if (win) {
+                win.stopAppActivity = () => {
+                    window.removeEventListener('mouseup', stop);
+                    resizeObserver.disconnect();
+                };
+            }
 
             window.clearCanvas = () => ctx.clearRect(0, 0, canvas.width, canvas.height);
             window.saveCanvas = () => {
