@@ -1238,35 +1238,55 @@
         }
 
         function loadBrowser(container) {
+            const initialUrl = 'https://www.wikipedia.org';
             container.innerHTML = `
                 <div class="browser-container">
                     <div class="browser-toolbar">
-                        <button class="app-btn" id="browser-back">⬅</button>
                         <button class="app-btn" id="browser-refresh">↻</button>
-                        <input type="text" id="browser-url" class="browser-address" placeholder="https://...">
+                        <input type="text" id="browser-url" class="browser-address" value="${initialUrl}">
                         <button class="app-btn" id="browser-go">Go</button>
                     </div>
                     <div class="browser-bookmarks">
                         <button class="app-btn" id="bm-wiki">Wikipedia</button>
                     </div>
-                    <iframe id="browser-frame" class="browser-frame" src="https://www.wikipedia.org"></iframe>
+                    <iframe id="browser-frame" class="browser-frame" src="${initialUrl}"></iframe>
                 </div>
             `;
             
             const frame = container.querySelector('#browser-frame');
             const urlInput = container.querySelector('#browser-url');
             
+            let historyStack = [initialUrl];
+            let historyIndex = 0;
+
+            const updateHistory = (url) => {
+                if (historyStack[historyIndex] === url) return;
+                
+                if (historyIndex < historyStack.length - 1) {
+                    historyStack = historyStack.slice(0, historyIndex + 1);
+                }
+                historyStack.push(url);
+                historyIndex++;
+                urlInput.value = url;
+            };
+
             const navigateTo = (url) => {
                 if (!url.startsWith('http')) url = 'https://' + url;
                 frame.src = url;
-                urlInput.value = url;
+                updateHistory(url);
+            };
+
+            frame.onload = () => {
+                try {
+                    const url = frame.contentWindow.location.href;
+                    if (url && url !== 'about:blank') updateHistory(url);
+                } catch (e) { }
             };
 
             container.querySelector('#browser-go').onclick = () => navigateTo(urlInput.value);
             container.querySelector('#browser-refresh').onclick = () => { try { frame.contentWindow.location.reload(); } catch(e) { frame.src = frame.src; } };
-            container.querySelector('#browser-back').onclick = () => { try { frame.contentWindow.history.back(); } catch(e) { console.log('Cross-origin history blocked'); } };
             
-            container.querySelector('#bm-wiki').onclick = () => navigateTo('https://www.wikipedia.org');
+            container.querySelector('#bm-wiki').onclick = () => navigateTo(initialUrl);
 
             urlInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') navigateTo(urlInput.value);
